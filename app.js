@@ -134,7 +134,7 @@ case 'open-admin':go('admin');break;
 case 'close-modal':closeModal();break;
 case 'back-admin':state.page='profile';render();break;
 case 'admin-toggle-nav':state.adminNavOpen=!state.adminNavOpen;renderAdmin();break;
-case 'admin-tab':state.adminTab=target.dataset.tab;state.adminNavOpen=false;renderAdmin();break;
+case 'admin-tab':state.adminTab=target.dataset.tab;state.adminNavOpen=false;renderAdmin();window.scrollTo({top:0,behavior:'smooth'});break;
 case 'admin-user':openUserModal(target.dataset.id);break;
 case 'admin-approve':if(confirm('Approve VIP and deduct plan price from the member wallet?'))await adminAction('approveVip',{requestId:target.dataset.id});break;
 case 'admin-reject':await adminAction('rejectVip',{requestId:target.dataset.id});break;
@@ -149,15 +149,15 @@ case 'admin-save-user':saveAdminUser();break;
 }});
 
 
-function availableMethods(){return (data().settings.paymentMethods||[{id:'manual',name:'Manual Transfer',number:data().settings.depositNumber||'',enabled:true}]).filter(function(m){return m.enabled!==false;});}
-function selectedMethod(){var el=document.getElementById('money-method');return availableMethods().find(function(m){return m.id===(el&&el.value);})||null;}
+function availableMethods(forDeposit){return (data().settings.paymentMethods||[{id:'manual',name:'Manual Transfer',number:data().settings.depositNumber||'',enabled:true}]).filter(function(m){return m.enabled!==false&&(!forDeposit||!!m.number);});}
+function selectedMethod(){var el=document.getElementById('money-method');return availableMethods(!!(document.getElementById('money-form')&&document.getElementById('money-form').dataset.type==='deposit')).find(function(m){return m.id===(el&&el.value);})||null;}
 function showMethodDestination(){var m=selectedMethod(),target=document.getElementById('payment-dest-number'),copy=document.getElementById('payment-copy'),submit=document.getElementById('money-submit');
  if(!target)return;
  target.textContent=m&&m.number?m.number:'This payment method has no receiving number yet';
  if(copy)copy.disabled=!(m&&m.number);
  if(submit)submit.disabled=!(m&&m.number);
 }
-function paymentModal(type){var st=data().settings,deposit=type==='deposit',methods=availableMethods(),contact=st.depositContact||'Mk_Malakzai',valid=methods.filter(function(m){return !deposit||m.number;});
+function paymentModal(type){var st=data().settings,deposit=type==='deposit',methods=availableMethods(type==='deposit'),contact=st.depositContact||'Mk_Malakzai',valid=methods.filter(function(m){return !deposit||m.number;});
 modal(deposit?'Manual deposit':'Manual withdrawal',
 '<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
 '<form id="money-form" data-type="'+type+'">'+
@@ -174,7 +174,7 @@ document.addEventListener('change',function(e){if(e.target&&e.target.id==='money
 document.addEventListener('submit',async function(e){if(e.target.id==='staff-form'){e.preventDefault();if(!confirm('Update role for this Telegram user?'))return;await adminAction('setRole',{userId:document.getElementById('staff-id').value.trim(),role:document.getElementById('staff-role').value});return;}
 if(e.target.id==='method-form'){e.preventDefault();await adminAction('savePaymentMethod',{methodId:e.target.dataset.id,method:{name:document.getElementById('method-name').value.trim(),number:document.getElementById('method-number').value.trim(),enabled:document.getElementById('method-enabled').value==='yes'}});return;}
 if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
-async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();}catch(e){toast(e.message);state.page='profile';render();}}
+async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();window.scrollTo({top:0,behavior:'smooth'});}catch(e){toast(e.message);state.page='profile';render();}}
 
 
 var adminNavigation=[
@@ -293,7 +293,6 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  root.className='app-shell admin-shell';root.innerHTML=html+footer()+'</div>'+adminTabs();
  var search=document.getElementById('admin-search');
  if(search)search.addEventListener('input',function(){var q=search.value.toLowerCase().trim();document.getElementById('admin-users').innerHTML=adminUserRows(a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}));});
- window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function openUserModal(id){var u=state.admin.users.find(function(x){return x.id===id;});if(!u)return;
