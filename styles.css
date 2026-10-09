@@ -16,3 +16,38 @@
 @keyframes slideIn{from{transform:translateY(25px);opacity:.6}to{transform:translateY(0);opacity:1}}@keyframes fadeIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}.view{animation:fadeIn .23s ease}.hidden{display:none!important}
 @media (min-width:850px){body{background:radial-gradient(ellipse at 50% 0%,#15191f 0,#090c12 65%)}.app-shell{margin:28px auto 0;min-height:calc(100vh - 28px);border:1px solid var(--stroke);border-bottom:0;border-radius:30px 30px 0 0;background:rgba(10,14,20,.84)}.bottom-nav{border:1px solid var(--stroke);border-bottom:0;border-radius:21px 21px 0 0}}
 @media (max-width:370px){.app-shell{padding:0 15px 110px}.hero{padding:23px 20px;min-height:209px}.hero-amount{font-size:39px}.stat-small{padding:13px 9px}.stat-small .value{font-size:19px}.daily-card{padding:13px;gap:8px}.daily-icon{width:39px;height:39px}.brand-name{font-size:15px}.btn-small{padding:10px 11px}}
+
+/* AFGLION financial dashboard — touch-first layouts */
+.wallet-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0 23px}
+.wallet-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:105px;padding:14px 6px 11px;border-radius:18px;border:1px solid rgba(229,188,122,.17);background:linear-gradient(160deg,#1b2230,#101620);color:#fff;transition:transform .2s,border-color .2s}
+.wallet-action:active{transform:scale(.97)}
+.wallet-action:hover{border-color:rgba(233,193,125,.6)}
+.wallet-action>span{width:36px;height:36px;display:grid;place-items:center;background:rgba(220,181,114,.13);color:var(--gold2);border-radius:12px}
+.wallet-action b{font-size:12px;font-weight:800}.wallet-action small{color:var(--muted);font-size:9px}
+.earning-card{position:relative;background:radial-gradient(circle at 100% 0%,rgba(221,177,110,.13),transparent 60%),#131b25;border:1px solid rgba(226,182,108,.25);border-radius:22px;padding:20px;overflow:hidden}
+.earning-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}
+.earning-top h3{font:800 18px "Plus Jakarta Sans",sans-serif;margin:9px 0 5px;letter-spacing:-.04em}
+.earning-top p{font-size:11px;color:var(--muted);line-height:1.6;margin:0;max-width:280px}
+.earning-top .round-icon{background:rgba(222,178,105,.14);color:var(--gold2);width:46px;height:46px;border-radius:15px;display:grid;place-items:center}
+.plan-big{background:rgba(225,184,111,.08);border:1px solid rgba(225,184,111,.12);border-radius:15px;padding:17px 16px;margin-top:19px}
+.plan-big b{display:block;font:800 27px "Plus Jakarta Sans",sans-serif;color:var(--gold2);letter-spacing:-.07em}
+.plan-big span{font-size:11px;color:#c6b9a5}
+.plan-progress{border-radius:18px;padding:20px;background:var(--surface);border:1px solid var(--stroke)}
+.plan-progress b{font-size:20px;display:block;color:var(--gold2)}
+.plan-progress small{font-size:11px;color:var(--muted);display:block;margin:8px 0 18px}
+.transaction-list{display:flex;flex-direction:column;gap:10px}
+.transaction-row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px;border-radius:16px;border:1px solid var(--stroke);background:var(--surface)}
+.transaction-icon{display:grid;place-items:center;width:39px;height:39px;border-radius:13px;background:rgba(219,177,109,.12);color:var(--gold2)}
+.transaction-main{flex:1 1 120px;min-width:0}
+.transaction-main strong{font-size:12px;display:block;overflow-wrap:anywhere}
+.transaction-main small{display:block;font-size:10px;color:var(--muted);margin-top:4px}
+.mini-cancel{background:transparent;border:1px solid rgba(252,139,145,.3);border-radius:8px;color:var(--red);font-size:10px;padding:7px 10px}
+.payment-review{background:linear-gradient(155deg,#1c2532,#121923);border:1px solid rgba(255,255,255,.11);border-radius:18px;padding:17px;margin:12px 0}
+.review-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.review-header b{font-size:13px;color:var(--gold2)}.payment-review p{font-size:12px;color:#d1d5df;overflow-wrap:anywhere;margin:10px 0;line-height:1.5}
+.payment-review small{font-size:10px;color:var(--muted)}
+.review-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.review-actions .btn{justify-content:center}
+.tier .tier-price{font-size:14px}.tier-feature{font-size:12px;line-height:1.5}
+.profile-stat .label,.stat-small .label{font-size:11px}
+.admin-shell .inline-fields{margin-bottom:7px}
+@media(max-width:370px){.wallet-actions{gap:7px}.wallet-action{min-height:93px;padding:11px 3px}.wallet-action b{font-size:11px}.wallet-action small{font-size:8px}.admin-row{flex-wrap:wrap}.mini-actions{width:100%}}
