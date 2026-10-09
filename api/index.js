@@ -17,7 +17,7 @@ const DEFAULTS = {
  dailyBonus:0, dailyEnabled:false, referralPercent:10, minDeposit:50, minWithdraw:100,
  forceJoinEnabled:true,forceJoinChannel:'https://t.me/geminipromtshub',homeChannelUrl:'https://t.me/geminipromtshub',
  depositNumber:'',depositContact:'Mk_Malakzai',
- notifyApprovals:false,notificationChannel:'https://t.me/geminipromtshub',
+ notifyApprovals:true,notificationChannel:'https://t.me/AFGlionpayouts',
  depositInstructions:'Send payment using the method agreed with support. Enter a genuine transaction reference; approval is manual.',
  payoutInstructions:'Withdrawals are reviewed manually. Enter a correct payment method and recipient details.',
  plans:{
@@ -294,8 +294,11 @@ async function route(req){
   if(req.method!=='POST')fail(405,'POST required');
   const type=body.type;
   if(!['deposit','withdraw'].includes(type))fail(400,'Invalid transaction type');
-  const amount=checkAmount(body.amount,1,1000000),details=secureString(body.details,300);
-  if(details.length<5)fail(400,'Provide payment reference or recipient details');
+  const amount=checkAmount(body.amount,1,1000000);
+  const paymentReference=type==='deposit'?secureString(body.reference||body.details,300):'';
+  const payoutRecipient=type==='withdraw'?secureString(body.recipient||body.details,300):'';
+  const details=type==='deposit'?paymentReference:payoutRecipient;
+  if(details.length<5)fail(400,type==='deposit'?'Provide your deposit transfer reference':'Provide the withdrawal recipient phone or account');
   const submittedMethod=secureString(body.methodId||body.method,70);
   const current=settings(await settingRef.get());
   const selected=current.paymentMethods.find(m=>m.enabled!==false&&(m.id===submittedMethod||m.name===submittedMethod));
@@ -312,7 +315,7 @@ async function route(req){
    if(!confirmed||(type==='deposit'&&!confirmed.number))fail(409,'Payment method was changed. Reload the app.');
    if(type==='withdraw'&&(u.data().balance||0)<amount)fail(409,'Insufficient available AFN balance');
    if(type==='withdraw')tx.update(ref,{balance:admin.firestore.FieldValue.increment(-amount),pendingWithdraw:admin.firestore.FieldValue.increment(amount)});
-   tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,method,methodId:selected.id,receivingNumber:selected.number,details,status:'pending',createdAt:now,reviewedAt:0});
+   tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,method,methodId:selected.id,receivingNumber:type==='deposit'?selected.number:'',paymentReference,payoutRecipient,details,status:'pending',createdAt:now,reviewedAt:0});
    tx.set(ref.collection('activity').doc(),{label:(type==='deposit'?'Deposit':'Withdrawal')+' request submitted',amount:0,at:now});
    return {ok:true,requestId:reqRef.id};
   });
@@ -476,6 +479,48 @@ async function route(req){
   }
   // VIP purchases are automatically activated in one Firestore transaction; no manual VIP approvals.
 
+  if(type==='testNotification'){
+   const ss=settings(await settingRef.get()),channel=channelUrl(ss.notificationChannel);
+   const chatId='@'+channel.split('/').pop();
+   let payload;
+   try{
+    const response=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/sendMessage',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({chat_id:chatId,text:'🦁 <b>AFGLION · MEMBERS CLUB</b>\n━━━━━━━━━━━━━━━━\n🧪 <b>CHANNEL TEST</b>\n✅ Your payout notification channel is connected.\n💳 Approved deposits and withdrawals will appear here when notifications are enabled.\n━━━━━━━━━━━━━━━━\n✨ <i>Official AFGLION notifications</i>',parse_mode:'HTML',disable_web_page_preview:true}),
+     signal:AbortSignal.timeout(9000)
+    });
+    payload=await response.json();
+   }catch(e){fail(502,'Telegram connection error. Check your bot and network.');}
+   if(!payload.ok)fail(502,'Telegram: '+secureString(payload.description||'Unable to post to channel',180));
+   return {ok:true,channel,noticeSent:true};
+  }
+  if(type==='setupWelcomeWebhook'){
+   if(role!=='owner')fail(403,'Only owners can activate the bot webhook');
+   const base='https://velora-members-club.vercel.app';
+   const secret=crypto.createHash('sha256').update('afglion-webhook-v1:'+process.env.TELEGRAM_BOT_TOKEN).digest('hex');
+   let response,payload;
+   try{
+    response=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/setWebhook',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({url:base+'/api/telegram',secret_token:secret,allowed_updates:['message'],drop_pending_updates:false}),
+     signal:AbortSignal.timeout(9000)
+    });
+    payload=await response.json();
+   }catch(e){fail(502,'Could not connect to Telegram to set the welcome webhook');}
+   if(!payload.ok)fail(502,'Telegram webhook failed: '+secureString(payload.description||'Unknown error',190));
+   return {ok:true,webhookUrl:base+'/api/telegram',channel:'https://t.me/AFGlionpayouts'};
+  }
+  if(type==='checkWelcomeWebhook'){
+   if(role!=='owner')fail(403,'Only owners can inspect the bot webhook');
+   let result;
+   try{
+    const response=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/getWebhookInfo',{signal:AbortSignal.timeout(9000)});
+    const resultJson=await response.json();
+    if(!resultJson.ok)fail(502,'Telegram failed to read the bot webhook');
+    result=resultJson.result;
+   }catch(e){if(e.status)throw e;fail(502,'Telegram could not fetch webhook status');}
+   return {ok:true,webhookUrl:result.url||'',pendingUpdates:result.pending_update_count||0,error:secureString(result.last_error_message,160),isAfglionWebhook:result.url==='https://velora-members-club.vercel.app/api/telegram'};
+  }
   if(type==='retryNotification'){
    const noticeId=secureString(body.noticeId,100);
    if(!/^[A-Za-z0-9_-]{10,100}$/.test(noticeId))fail(400,'Invalid notification ID');
