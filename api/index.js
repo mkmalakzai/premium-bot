@@ -9,7 +9,7 @@ const admin = require('firebase-admin');
 const DAY = 86400000;
 const C = {
  users:'veloraUsers', settings:'veloraSettings', requests:'veloraVipRequests',
- money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit'
+ money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit', notices:'veloraApprovalNotices'
 };
 const DEFAULTS = {
  appName:'AFGLION', botUsername:'Afglionbot',
@@ -17,6 +17,7 @@ const DEFAULTS = {
  dailyBonus:0, dailyEnabled:false, referralPercent:10, minDeposit:50, minWithdraw:100,
  forceJoinEnabled:true,forceJoinChannel:'https://t.me/geminipromtshub',homeChannelUrl:'https://t.me/geminipromtshub',
  depositNumber:'',depositContact:'Mk_Malakzai',
+ notifyApprovals:false,notificationChannel:'https://t.me/geminipromtshub',
  depositInstructions:'Send payment using the method agreed with support. Enter a genuine transaction reference; approval is manual.',
  payoutInstructions:'Withdrawals are reviewed manually. Enter a correct payment method and recipient details.',
  plans:{
@@ -91,6 +92,49 @@ async function memberStatus(id,config,role='user'){
  const joined=['creator','administrator','member'].includes(m.status)||(m.status==='restricted'&&m.is_member===true);
  return {joined,url,issue:joined?'':'Join the channel and tap Check Joined.'};
 }
+
+function notificationText(entry){
+ const stamp=new Date(entry.createdAt||Date.now()).toISOString().slice(0,16).replace('T',' ')+' UTC';
+ const type=entry.type==='deposit'?'DEPOSIT CONFIRMED':'WITHDRAWAL COMPLETED';
+ const icon=entry.type==='deposit'?'💳':'💸';
+ const safeAmount=Number.isSafeInteger(entry.amount)?entry.amount.toLocaleString('en-US'):'0';
+ const id=String(entry.userId||''),masked=id?'•••• '+id.slice(-4):'AFGLION member';
+ return ['🦁 <b>AFGLION · MEMBERS CLUB</b>','━━━━━━━━━━━━━━━━',
+ icon+' <b>'+type+'</b>','',
+ '✅ <b>Status:</b> Approved','💰 <b>Amount:</b> '+safeAmount+' AFN',
+ '👤 <b>Member:</b> '+masked,'🕒 <b>Time:</b> '+stamp,
+ '━━━━━━━━━━━━━━━━','✨ <i>Trusted service. Premium experience.</i>'].join('\n');
+}
+async function deliverNotice(store,noticeId){
+ const doc=store.collection(C.notices).doc(noticeId),now=Date.now();
+ const claimed=await store.runTransaction(async tx=>{
+  const snapshot=await tx.get(doc);
+  if(!snapshot.exists)fail(404,'Notification was not found');
+  const message=snapshot.data();
+  if(message.status==='sent')return {alreadySent:true};
+  if(message.status==='sending'&&now-(message.claimedAt||0)<60000)fail(409,'Message delivery is in progress');
+  tx.update(doc,{status:'sending',claimedAt:now,attempts:(message.attempts||0)+1});
+  return message;
+ });
+ if(claimed.alreadySent)return {sent:true,alreadySent:true};
+ try{
+  const channel=channelUrl(claimed.channel),chatId='@'+channel.split('/').pop();
+  const resp=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/sendMessage',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({chat_id:chatId,text:notificationText(claimed),parse_mode:'HTML',disable_web_page_preview:true}),
+   signal:AbortSignal.timeout(9000)
+  });
+  const result=await resp.json();
+  if(!result.ok)throw new Error(result.description||'Telegram rejected the message');
+  await doc.update({status:'sent',sentAt:Date.now(),messageId:result.result&&result.result.message_id||null,lastError:''});
+  return {sent:true};
+ }catch(e){
+  const message=secureString(e.message||'Telegram error',220);
+  await doc.update({status:'failed',lastError:message,failedAt:Date.now()});
+  return {sent:false,error:message};
+ }
+}
+
 function sessionKey(){return crypto.createHash('sha256').update('afglion-auth-1:'+process.env.TELEGRAM_BOT_TOKEN).digest();}
 function signSession(id){
  const head=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
@@ -284,21 +328,36 @@ async function route(req){
    return {ok:true};
   });
  }
- if(action==='vipRequest'){
+ if(action==='vipRequest'||action==='vipPurchase'){
   if(req.method!=='POST')fail(405,'POST required');
-  const tier=String(body.tier||''),requestRef=store.collection(C.requests).doc(id);
+  const tier=secureString(body.tier,32);
   if(!/^[a-z0-9_-]{2,32}$/.test(tier))fail(400,'Invalid VIP package');
+  const now=Date.now();
   return await store.runTransaction(async tx=>{
-   const [u,r,s]=await Promise.all([tx.get(ref),tx.get(requestRef),tx.get(settingRef)]);
+   const [u,s]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
-   const p=planFor(settings(s),tier),now=Date.now();
-   if((u.data().balance||0)<p.price)fail(409,'Insufficient balance. Deposit AFN and wait for admin approval first.');
-   if(r.exists&&r.data().status==='pending')fail(409,'VIP request already pending');
-   if(u.data().vipTier===tier&&(u.data().vipUntil||0)>now)fail(409,'This VIP plan is already active');
-   tx.set(requestRef,{userId:id,name:u.data().name||'Member',tier,planSnapshot:p,price:p.price,status:'pending',createdAt:now,reviewedAt:0});
-   return {ok:true};
+   const who=u.data(),config=settings(s),packageInfo=planFor(config,tier);
+   if((who.vipUntil||0)>now&&who.vipTier&&who.vipTier!=='free')fail(409,'Finish your active VIP membership before buying another package');
+   if((who.balance||0)<packageInfo.price)fail(409,'Insufficient AFN balance. Deposit first and wait for deposit approval.');
+   const parentId=who.referrerId,linkedRef=parentId&&parentId!==id?users.doc(parentId):null;
+   const linked=linkedRef?await tx.get(linkedRef):null;
+   const purchasedPackage={name:packageInfo.name,price:packageInfo.price,dailyReward:packageInfo.dailyReward,days:packageInfo.days,enabled:true};
+   tx.update(ref,{balance:admin.firestore.FieldValue.increment(-packageInfo.price),vipTier:tier,
+    vipActivatedAt:now,vipUntil:now+packageInfo.days*DAY,vipPlanSnapshot:purchasedPackage,
+    vipDaysClaimed:0,vipLastClaimSlot:0});
+   tx.set(ref.collection('activity').doc(),{label:packageInfo.name+' VIP purchase',amount:-packageInfo.price,at:now});
+   const referralPct=config.referralPercent||0;
+   const award=Math.floor(packageInfo.price*referralPct/100);
+   if(linked&&linked.exists&&!linked.data().banned&&award>0){
+    tx.update(linkedRef,{balance:admin.firestore.FieldValue.increment(award),totalEarned:admin.firestore.FieldValue.increment(award),
+     referralEarned:admin.firestore.FieldValue.increment(award)});
+    tx.set(linkedRef.collection('activity').doc(),{label:'VIP referral commission',amount:award,at:now});
+    tx.set(store.collection(C.awards).doc(),{parentId,memberId:id,vipTier:tier,amount:award,percent:referralPct,at:now});
+   }
+   return {ok:true,tier,planName:packageInfo.name,charged:packageInfo.price,vipUntil:now+packageInfo.days*DAY,referralAward:linked&&linked.exists?award:0,approvalRequired:false};
   });
  }
+
  if(roleRank(role)===0)fail(403,'Administrator access required');
  if(action==='adminData'){
   const [us,rs,m,ss,total,staffSnap]=await Promise.all([
@@ -410,48 +469,30 @@ async function route(req){
     tx.update(userRef,update);
    });return {ok:true};
   }
-  if(type==='approveVip'||type==='rejectVip'){
-   const requestId=String(body.requestId||'');
-   if(!numericId(requestId))fail(400,'Invalid VIP request');
-   const requestRef=store.collection(C.requests).doc(requestId),target=users.doc(requestId);
-   return await store.runTransaction(async tx=>{
-    const [r,u,s]=await Promise.all([tx.get(requestRef),tx.get(target),tx.get(settingRef)]);
-    if(!r.exists||r.data().status!=='pending')fail(409,'Request already reviewed');
-    if(!u.exists||u.data().banned)fail(403,'Member unavailable');
-    if(type==='rejectVip'){
-     tx.update(requestRef,{status:'rejected',reviewedAt:now,reviewedBy:id});return {ok:true};
-    }
-    const p=r.data().planSnapshot||planFor(settings(s),r.data().tier),charge=r.data().price;
-    if(!whole(charge,1,1000000)||(u.data().balance||0)<charge)fail(409,'Insufficient member balance');
-    const parentId=u.data().referrerId;
-    const parentRef=parentId?users.doc(parentId):null,parent=parentRef?await tx.get(parentRef):null;
-    tx.update(target,{balance:admin.firestore.FieldValue.increment(-charge),vipTier:r.data().tier,
-     vipActivatedAt:now,vipUntil:now+p.days*DAY,vipPlanSnapshot:p,vipDaysClaimed:0,vipLastClaimSlot:0});
-    tx.update(requestRef,{status:'approved',reviewedAt:now,reviewedBy:id,chargedAmount:charge});
-    tx.set(target.collection('activity').doc(),{label:r.data().tier.toUpperCase()+' VIP purchase',amount:-charge,at:now});
-    const pct=settings(s).referralPercent||0,award=Math.floor(charge*pct/100);
-    if(parent&&parent.exists&&!parent.data().banned&&award>0){
-     tx.update(parentRef,{balance:admin.firestore.FieldValue.increment(award),totalEarned:admin.firestore.FieldValue.increment(award),
-       referralEarned:admin.firestore.FieldValue.increment(award)});
-     tx.set(parentRef.collection('activity').doc(),{label:'VIP referral commission',amount:award,at:now});
-     tx.set(store.collection(C.awards).doc(),{parentId,memberId:requestId,vipTier:r.data().tier,amount:award,percent:pct,at:now});
-    }
-    return {ok:true,chargedAmount:charge,referralAward:award};
-   });
+  // VIP purchases are automatically activated in one Firestore transaction; no manual VIP approvals.
+
+  if(type==='retryNotification'){
+   const noticeId=secureString(body.noticeId,100);
+   if(!/^[A-Za-z0-9_-]{10,100}$/.test(noticeId))fail(400,'Invalid notification ID');
+   return {ok:true,...await deliverNotice(store,noticeId)};
   }
   if(type==='reviewMoney'){
    const requestId=secureString(body.requestId,100),approve=body.approve;
-   if(typeof approve!=='boolean'||!requestId)fail(400,'Invalid review request');
+   if(typeof approve!=='boolean'||!/^[A-Za-z0-9_-]{10,100}$/.test(requestId))fail(400,'Invalid payment review');
    const moneyRef=store.collection(C.money).doc(requestId);
-   return await store.runTransaction(async tx=>{
+   const record=await store.runTransaction(async tx=>{
     const r=await tx.get(moneyRef);
     if(!r.exists||r.data().status!=='pending')fail(409,'Transaction already reviewed');
-    const item=r.data(),target=users.doc(item.userId),u=await tx.get(target);
+    const item=r.data(),target=users.doc(item.userId);
+    const [u,current]=await Promise.all([tx.get(target),tx.get(settingRef)]);
     if(!u.exists)fail(404,'Account not found');
     const amount=item.amount;
-    if(!whole(amount,1,1000000))fail(400,'Invalid stored amount');
+    if(!whole(amount,1,1000000)||!['deposit','withdraw'].includes(item.type))fail(400,'Invalid transaction record');
     const update={};
-    if(item.type==='deposit'&&approve){update.balance=admin.firestore.FieldValue.increment(amount);update.totalDeposited=admin.firestore.FieldValue.increment(amount);}
+    if(item.type==='deposit'&&approve){
+     update.balance=admin.firestore.FieldValue.increment(amount);
+     update.totalDeposited=admin.firestore.FieldValue.increment(amount);
+    }
     if(item.type==='withdraw'){
      update.pendingWithdraw=admin.firestore.FieldValue.increment(-amount);
      if(approve)update.totalWithdrawn=admin.firestore.FieldValue.increment(amount);
@@ -460,9 +501,19 @@ async function route(req){
     tx.update(target,update);
     tx.update(moneyRef,{status:approve?'approved':'rejected',reviewedAt:now,reviewedBy:id});
     tx.set(target.collection('activity').doc(),{label:item.type+' '+(approve?'approved':'rejected'),amount:item.type==='deposit'&&approve?amount:item.type==='withdraw'&&!approve?amount:0,at:now});
-    return {ok:true};
+    const rules=settings(current),channel=rules.notificationChannel;
+    const notify=approve&&rules.notifyApprovals&&!!channel;
+    if(notify){
+     const noticeRef=store.collection(C.notices).doc(requestId);
+     tx.set(noticeRef,{type:item.type,amount,userId:item.userId,channel,status:'pending',createdAt:now,attempts:0,reviewedBy:id,lastError:''});
+    }
+    return {ok:true,notificationQueued:notify};
    });
+   if(!record.notificationQueued)return {...record,notificationSent:null};
+   const delivery=await deliverNotice(store,requestId);
+   return {...record,notificationSent:delivery.sent,notificationError:delivery.error||''};
   }
+
   fail(400,'Unknown administrator action');
  }
  fail(404,'API endpoint not found');
