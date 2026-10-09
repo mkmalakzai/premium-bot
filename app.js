@@ -164,6 +164,9 @@ case 'admin-money-approve':if(confirm('Approve this manual payment request? Veri
 case 'admin-money-reject':if(confirm('Reject this payment request?'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:false});break;
 case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
 case 'admin-test-notice':await adminAction('testNotification',{});break;
+case 'broadcast-start':await beginBroadcast();break;
+case 'broadcast-continue':await advanceBroadcast();break;
+
 case 'admin-activate-welcome':if(confirm('Activate @Afglionbot welcome messages? This replaces any existing webhook connected to this bot.'))await adminAction('setupWelcomeWebhook',{});break;
 case 'admin-check-welcome':try{var info=await api('adminAction',{type:'checkWelcomeWebhook'});modal('Telegram /start status','<p class="body-sub"><b>Webhook:</b> '+esc(info.webhookUrl||'None')+'</p><p class="body-sub"><b>AFGLION welcome active:</b> '+(info.isAfglionWebhook?'YES ✅':'NO ❌')+'</p><p class="body-sub"><b>Pending messages:</b> '+n(info.pendingUpdates)+'</p>'+(info.error?'<div class="alert">Telegram error: '+esc(info.error)+'</div>':'')+'<div class="alert">If not active, press Activate /start welcome bot first.</div>');}catch(e){toast(e.message);}break;
 
@@ -261,7 +264,7 @@ async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegra
 
 var adminNavigation=[
  {group:'Main',items:[['overview','Dashboard','home'],['users','Members','users']]},
- {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['notices','Channel notifications','bell']]},
+ {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['notices','Channel notifications','bell'],['broadcast','Broadcast','bell']]},
  {group:'Subscriptions',items:[['packages','VIP packages','crown']]},
  {group:'Configuration',items:[['settings','Settings','settings'],['branding','Official brand kit','spark'],['staff','Staff & owners','shield']]}
 ];
@@ -318,6 +321,13 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<p>'+(req.type==='deposit'?'Deposit transfer reference: ':'Withdrawal recipient: ')+esc(req.type==='deposit'?(req.paymentReference||req.details):(req.payoutRecipient||req.details))+'</p><small>'+fmtDate(req.createdAt)+'</small>'+
  '<div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
  }).join(''):empty('check','No pending payments','New deposit and withdrawal requests will show here.');
+ }
+ if(tab==='broadcast'){
+ html+='<div class="admin-callout"><b>Official member broadcast</b><p>Send an announcement to Telegram users who have previously opened the Mini App. Only the owner can launch a broadcast. Telegram users who blocked the bot or never started it may not receive messages.</p></div>'+
+ '<div class="panel"><label class="form-label">Announcement text</label><textarea class="field" id="broadcast-message" rows="7" maxlength="1600" placeholder="Write a professional announcement for your members..."></textarea>'+
+ '<div class="muted-note">10–1600 characters. Keep messages relevant; avoid unsolicited or frequent broadcasts.</div>'+
+ (a.callerRole==='owner'?'<button class="btn btn-primary btn-block" data-action="broadcast-start">Start broadcast</button>':'<div class="alert">Only the owner can send broadcasts.</div>')+
+ '</div><div id="broadcast-progress" class="channel-test-banner"><b>Delivery status</b><p id="broadcast-status">No broadcast started in this session.</p><button class="btn btn-outline btn-block" data-action="broadcast-continue">Send next batch / Resume</button></div>';
  }
  if(tab==='notices'){
  html+='<div class="admin-callout">Approved deposits and withdrawals can automatically send premium transaction announcements to your Telegram channel. Add @Afglionbot as a channel administrator with Post Messages permission. If a notification did not arrive, use Test below.</div>'+
@@ -455,6 +465,37 @@ modal(key?'Edit VIP package':'Create VIP package',
  '<label class="form-label">Visibility</label><select class="field" id="package-enabled"><option value="yes" '+(!p||p.enabled!==false?'selected':'')+'>Visible to users</option><option value="no" '+(p&&p.enabled===false?'selected':'')+'>Hidden</option></select>'+
  '<div class="alert">Changing a package will not change rewards already approved for existing members.</div>'+
  '<button class="btn btn-primary btn-block" style="margin-top:20px">Save VIP package</button></form>');
+}
+
+var activeBroadcastId='';
+var broadcastWorking=false;
+function broadcastStatusText(outcome){
+ var el=document.getElementById('broadcast-status');
+ if(el)el.textContent='Status: '+(outcome.status||'running')+' | Processed: '+n(outcome.processed||0)+' | Delivered: '+n(outcome.sent||0)+' | Failed: '+n(outcome.failed||0);
+}
+async function beginBroadcast(){
+ if(broadcastWorking)return;
+ var field=document.getElementById('broadcast-message');
+ var message=field&&field.value.trim();
+ if(!message||message.length<10)return toast('Write at least 10 characters.');
+ if(!confirm('Send this announcement to all members? Messages cannot be recalled.'))return;
+ try{
+  var result=await api('adminAction',{type:'broadcastCreate',message:message});
+  activeBroadcastId=result.campaignId;
+  await advanceBroadcast();
+ }catch(e){toast(e.message);}
+}
+async function advanceBroadcast(){
+ if(broadcastWorking)return;
+ if(!activeBroadcastId)return toast('Start a broadcast first.');
+ broadcastWorking=true;
+ try{
+  var batch=await api('adminAction',{type:'broadcastStep',campaignId:activeBroadcastId});
+  broadcastStatusText(batch);
+  if(batch.status==='completed')toast('Broadcast completed: '+n(batch.sent)+' delivered, '+n(batch.failed)+' failed.');
+  else toast('Batch sent. Press Resume to continue.');
+ }catch(e){toast(e.message);}
+ finally{broadcastWorking=false;}
 }
 
 async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{var outcome=await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast(outcome&&outcome.notificationSent===false?'Approved, but channel post failed — open Notifications':outcome&&outcome.sent===false?'Notification failed. Check channel permissions.':'Changes saved');}catch(e){toast(e.message);}finally{state.loading=false;}}
