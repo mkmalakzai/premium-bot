@@ -2,11 +2,20 @@
 
 A mobile-first HTML/CSS/JavaScript Telegram Mini App deployed on Vercel with a Firebase Cloud Firestore backend. The visual public Firebase config references the existing **afglion-47b07** project, but **all accounts and AFN balances are accessed through authenticated Vercel functions using Firebase Admin SDK**. The public Firebase web config alone does **not** activate the backend.
 
+## October 2026 update — channel gate, flexible VIP, deposit instructions
+
+- **Force Join:** default public channel `https://t.me/geminipromtshub`, changeable from Admin → Settings. The bot **@Afglionbot must be added as administrator to this Telegram channel**, otherwise the official `getChatMember` API is not guaranteed to verify membership. The backend verifies membership before returning a Telegram API session and again for every protected request, and fails closed if it cannot confirm membership. Administrator IDs are exempt so channel misconfiguration cannot lock out the owner. Test force-join with a separate non-admin Telegram account.
+- **Home:** the daily free reward is **disabled by default** (no free earning reward on Home). Admin → Settings can enable it and control the amount. The Home page shows a configurable Telegram-channel button.
+- **VIP packages:** Admin → Packages creates, edits, hides and deletes custom named packages with arbitrary price, daily reward and duration (up to 20). Existing active subscriptions preserve their original approved terms; deleted packages are no longer offered. Pending purchase requests capture the package terms when submitted.
+- **Manual deposits:** Admin → Settings supplies the receiving **payment number** (no real number is hardcoded), the clickable screenshot recipient (default `@Mk_Malakzai`), and instructions. Customers copy the number, send payment, open the admin chat and submit a deposit request. Until the admin enters a receiving number, deposits are not accepted. The app does **not** transfer money or upload screenshots automatically.
+- **Avatar:** header photo is a single fixed-size, circular cropped image with an initial-letter fallback if the Telegram photo fails to load.
+- **Important:** this uses Telegram's real membership-check API. A link click alone does not unlock the app; an actual verified membership is required.
+
 ## Features
 
-- **Home:** AFN balance, free daily check-in with a 24-hour cooldown, announcements and VIP daily reward claims.
+- **Home:** AFN balance, announcements, official-channel button and optional free check-in (off by default).
 - **Referral:** Telegram `startapp=ref_<id>` invitations. Account association is signed and applied one time on onboarding; 10% default commission on an **approved paid VIP purchase** (not on signup), configurable by admin.
-- **VIP:** Admin-configurable price, per-day claim amount and plan length. Defaults: Gold **500 AFN**, **50 AFN** per eligible day for **30 days**; Elite 1,000 AFN, 110 AFN per eligible day for 30 days. The admin approves requests and deducts the price from already-confirmed available wallet funds. Each plan snapshots its approved terms. Each daily reward requires a claim, starting after 24 hours. Missed days do not accumulate.
+- **VIP:** Fully custom admin-managed packages with configurable price, per-day claim amount and plan length. Defaults: Gold **500 AFN**, **50 AFN** per eligible day for **30 days**; Elite 1,000 AFN, 110 AFN per eligible day for 30 days. The admin approves requests and deducts the price from already-confirmed available wallet funds. Each plan snapshots its approved terms. Each daily reward requires a claim, starting after 24 hours. Missed days do not accumulate.
 - **Wallet:** Manual deposit request (amount, method, reference) and manual withdrawal request (amount, method, recipient details), with request history. Deposits do not credit the wallet before approval. Withdrawals reserve the amount instantly and return it on rejection or user cancellation. Requests can be processed only once.
 - **Profile:** Telegram identity, edit display name, member status and earnings history.
 - **Admin:** Verified Telegram ID allowlist, member access, settings, prices, durations, referral %, free daily bonus, deposit/payout instructions, minimum amounts, and independent approve/reject queues for VIP/deposit/withdrawal.
