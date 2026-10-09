@@ -180,6 +180,8 @@ case 'admin-tab':state.adminTab=target.dataset.tab;state.adminNavOpen=false;rend
 case 'admin-user':openUserModal(target.dataset.id);break;
 case 'admin-approve':if(confirm('Approve VIP and deduct plan price from the member wallet?'))await adminAction('approveVip',{requestId:target.dataset.id});break;
 case 'admin-reject':await adminAction('rejectVip',{requestId:target.dataset.id});break;
+case 'brand-download':downloadBrandPng(target.dataset.type);break;
+case 'brand-copy':await copyValue(location.origin+'/afglion-brand.svg');break;
 case 'admin-add-method':methodModal('');break;
 case 'admin-edit-method':methodModal(target.dataset.id);break;
 case 'admin-delete-method':if(confirm('Delete this receiving method? Existing transaction history is preserved.'))await adminAction('deletePaymentMethod',{methodId:target.dataset.id});break;
@@ -190,6 +192,29 @@ case 'admin-save-settings':saveAdminSettings();break;
 case 'admin-save-user':saveAdminUser();break;
 }});
 
+
+
+function downloadBrandPng(kind){
+ var isWordmark=kind==='wordmark',asset=isWordmark?'/afglion-brand.svg':'/afglion-logo.svg';
+ var img=new Image();
+ img.onload=function(){
+  var canvas=document.createElement('canvas');
+  canvas.width=isWordmark?1720:1024;canvas.height=isWordmark?480:1024;
+  var ctx=canvas.getContext('2d');
+  if(!ctx){toast('Unable to export PNG here');return;}
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  canvas.toBlob(function(blob){
+   if(!blob){toast('PNG export unavailable');return;}
+   var url=URL.createObjectURL(blob),linkEl=document.createElement('a');
+   linkEl.href=url;linkEl.download=isWordmark?'AFGLION-Official-Brand.png':'AFGLION-App-Icon.png';
+   linkEl.style.display='none';document.body.appendChild(linkEl);linkEl.click();linkEl.remove();
+   setTimeout(function(){URL.revokeObjectURL(url);},15000);
+   toast('Your AFGLION logo is ready');
+  },'image/png');
+ };
+ img.onerror=function(){toast('Logo could not be loaded. Try again.');};
+ img.src=asset;
+}
 
 function availableMethods(forDeposit){return (data().settings.paymentMethods||[{id:'manual',name:'Manual Transfer',number:data().settings.depositNumber||'',enabled:true}]).filter(function(m){return m.enabled!==false&&(!forDeposit||!!m.number);});}
 function selectedMethod(){var el=document.getElementById('money-method');return availableMethods(!!(document.getElementById('money-form')&&document.getElementById('money-form').dataset.type==='deposit')).find(function(m){return m.id===(el&&el.value);})||null;}
@@ -223,7 +248,7 @@ var adminNavigation=[
  {group:'Main',items:[['overview','Dashboard','home'],['users','Members','users']]},
  {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings']]},
  {group:'Subscriptions',items:[['requests','VIP approvals','crown'],['packages','VIP packages','star']]},
- {group:'Configuration',items:[['settings','Settings','settings'],['staff','Staff & owners','shield']]}
+ {group:'Configuration',items:[['settings','Settings','settings'],['branding','Official brand kit','spark'],['staff','Staff & owners','shield']]}
 ];
 function adminLabel(key){
  for(var i=0;i<adminNavigation.length;i++){var item=adminNavigation[i].items.find(function(x){return x[0]===key});if(item)return item[1];}
@@ -309,6 +334,13 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  (a.rootOwners||[]).map(function(id){return '<div class="admin-row"><b>ID '+esc(id)+'</b><span class="badge">ROOT OWNER</span></div>';}).join('')+
  (a.staffRoles||[]).map(function(staff){return '<div class="admin-row"><b>ID '+esc(staff.id)+'</b><span class="badge">'+esc(staff.role.toUpperCase())+'</span></div>';}).join('');
  }
+ }
+ if(tab==='branding'){
+ html+='<div class="admin-callout">The same official AFGLION lion logo is used in the Mini App, loading screen, and public brand artwork. Save it as PNG or share the crisp SVG vector.</div>'+
+ '<div class="brand-kit-preview"><img src="/afglion-brand.svg" alt="Official AFGLION brand logo"></div>'+
+ '<div class="brand-kit-actions"><button class="btn btn-primary btn-block" data-action="brand-download" data-type="wordmark">Download full logo PNG</button><button class="btn btn-outline btn-block" data-action="brand-download" data-type="icon">Download app icon PNG</button>'+
+ '<button class="btn btn-ghost btn-block" data-action="brand-copy">Copy public logo link</button></div>'+
+ '<div class="brand-kit-small"><img src="/afglion-logo.svg" width="100" height="100" alt="Official AFGLION crest"><p>One official symbol. App icon, website, social media, watermark.</p></div>';
  }
  if(tab==='settings'){
  var st=a.settings;
