@@ -2,6 +2,14 @@
 
 A mobile-first HTML/CSS/JavaScript Telegram Mini App deployed on Vercel with a Firebase Cloud Firestore backend. The visual public Firebase config references the existing **afglion-47b07** project, but **all accounts and AFN balances are accessed through authenticated Vercel functions using Firebase Admin SDK**. The public Firebase web config alone does **not** activate the backend.
 
+## Final AFGLION identity and startup (October 9, 2026)
+
+- **One consistent official lion logo:** `afglion-logo.svg` (standalone app icon) and self-contained `afglion-brand.svg` (the exact same lion crest alongside AFGLION Members Club text). Both vector assets are hosted publicly in this project and may be reused for social media, cards, website or promotion.
+- **Animated launch screen:** a high-contrast black-and-gold, lion-branded loading overlay with animated orbit rings, glow, gold progress indicator, context-sensitive status and a smooth exit. It waits at least ~1.5 s before disappearing and has a 14-second fail-safe so it never indefinitely blocks access. Respects reduced-motion preferences.
+- **Shared brand:** The same lion crest appears in the header, join screen, admin header, footer, website favicon, social metadata and splash/loading screen.
+- **Reusable general branding:** The owner/admin can open **Admin → ☰ → Official brand kit**, preview the brand and export the main wordmark as a 1720×480 PNG or the application crest as a 1024×1024 PNG; the original vectors remain accessible at `/afglion-brand.svg` and `/afglion-logo.svg`.
+- **No backend changes:** Telegram authentication, subscriptions, Firebase, member balances and existing database records remain unchanged by this design update.
+
 ## October 9, 2026 — UI & admin improvements
 
 - **Languages:** Vanilla HTML, CSS and JavaScript for the Telegram Mini App; Node.js CommonJS Vercel API; Cloud Firestore with Firebase Admin SDK.
