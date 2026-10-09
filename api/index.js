@@ -251,6 +251,7 @@ async function route(req){
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
    const setting=settings(s);
    if(amount<(type==='deposit'?setting.minDeposit:setting.minWithdraw))fail(400,'Amount is below the current minimum');
+   if(type==='deposit'&&!setting.depositNumber)fail(503,'Deposit number is not configured by admin');
    if(type==='withdraw'&&(u.data().balance||0)<amount)fail(409,'Insufficient available AFN balance');
    if(type==='withdraw')tx.update(ref,{balance:admin.firestore.FieldValue.increment(-amount),pendingWithdraw:admin.firestore.FieldValue.increment(amount)});
    tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,method,details,status:'pending',createdAt:now,reviewedAt:0});
@@ -326,7 +327,7 @@ async function route(req){
      if(!packages[identifier]&&Object.keys(packages).length>=20)fail(400,'Maximum 20 VIP packages');
      packages[identifier]=p;
     }
-    tx.set(settingRef,{vipPackages:packages},{merge:true});
+    tx.set(settingRef,{...(snapshot.exists?snapshot.data():{}),vipPackages:packages});
     return {ok:true};
    });
   }
