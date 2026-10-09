@@ -82,3 +82,42 @@
 .package-manage{background:#151c26;border:1px solid var(--stroke);border-radius:18px;padding:17px;margin-top:12px}
 .package-manage-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.package-manage-top b{font-size:14px;display:block}.package-manage-top small{color:var(--muted);font-size:11px;margin-top:8px;display:block;line-height:1.5}.package-manage-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.package-manage-actions .btn{justify-content:center}
 @media(max-width:370px){.topbar{height:85px}.brand-name{font-size:15px}.join-screen h1{font-size:27px}.channel-banner{gap:9px;padding:14px 12px}.deposit-destination strong{font-size:18px}}
+
+
+/* AFGLION 3: mobile fit and dashboard admin */
+.hero-foot{min-width:0;gap:10px}
+.hero-tag{min-width:0;flex:1;line-height:1.3;font-size:9px;letter-spacing:.04em}
+.hero-tag span{flex:0 0 7px}
+.hero-stamp{flex:0 1 48%;max-width:48%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9px;line-height:1.45}
+.stat-small{min-width:0;overflow:hidden}
+.stat-small .label{white-space:normal;overflow:visible;line-height:1.3;min-height:25px;font-size:10px}
+.stat-small .value{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(15px,4.2vw,21px)}
+.stat-small .value.gold{font-size:clamp(11px,3.3vw,16px)!important}
+.profile-top>div:nth-child(2){min-width:0;flex:1}
+.profile-name,.profile-handle{overflow-wrap:anywhere}
+.profile-pic{flex:0 0 72px}
+.vip-current{min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.5}
+.admin-shell{padding-bottom:50px}
+.admin-main-header{gap:12px;height:83px}
+.admin-menu-trigger{width:43px;height:43px;flex:0 0 43px;border:1px solid var(--stroke);border-radius:14px;background:var(--surface);color:var(--text);display:grid;place-items:center}
+.admin-heading{flex:1;min-width:0}
+.admin-heading .brand-name{font-size:14px;letter-spacing:.1em}
+.admin-heading .brand-kicker{font-size:9px}
+.admin-view{padding-bottom:45px}
+.admin-context{display:flex;gap:14px;align-items:center;justify-content:space-between;margin:14px 0 24px}
+.admin-context h1{font:800 27px/1.2 "Plus Jakarta Sans",sans-serif;letter-spacing:-.06em;margin:6px 0 0}
+.admin-context-icon{flex:0 0 48px;width:48px;height:48px;display:grid;place-items:center;background:linear-gradient(145deg,#322c26,#181e29);border:1px solid rgba(222,183,116,.3);border-radius:16px;color:var(--gold2)}
+.admin-card{min-width:0;background:var(--surface);border-radius:20px;min-height:98px}
+.admin-card b{display:block;font-size:clamp(19px,5vw,26px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.admin-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.admin-shortcut{min-width:0;display:flex;flex-direction:column;align-items:flex-start;position:relative;text-align:left;gap:12px;padding:17px 14px;border:1px solid var(--stroke);border-radius:19px;background:var(--surface);color:var(--text)}
+.admin-shortcut strong{display:block;font-size:12px;margin-bottom:5px}
+.admin-shortcut small{display:block;font-size:10px;color:var(--muted);line-height:1.45}
+.admin-shortcut>.action-icon{width:36px;height:36px;border-radius:11px}
+.admin-shortcut>svg{position:absolute;top:20px;right:13px;width:16px;height:16px;color:var(--muted)}
+.admin-callout{padding:16px 17px;border-radius:17px;background:linear-gradient(115deg,rgba(199,159,93,.11),rgba(163,173,192,.04));color:var(--muted);border:1px solid rgba(213,173,107,.18);font-size:11px;line-height:1.75;margin:13px 0 19px}
+.admin-row-person{min-width:0;flex:1}
+.admin-row-person small{max-width:100%;white-space:normal;line-height:1.5}
+.admin-row{min-width:0;gap:11px}
+.admin-row>.btn{flex:0 0 auto}
+.admin-row .badge{margin-left:4px}
