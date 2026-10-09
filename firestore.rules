@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All data is read and written through trusted Vercel server functions,
+    // after signed Telegram initData and server-side authorization checks.
+    // The Firebase Admin SDK bypasses these client rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
