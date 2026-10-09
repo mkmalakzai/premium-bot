@@ -285,3 +285,12 @@ html[data-theme="light"] .admin-balance-overview strong{color:#8d611e}
 .admin-main-header .admin-heading{min-width:0}
 .admin-main-header .brand-name{white-space:nowrap;font-size:12px}
 @media(max-width:370px){.admin-brand-logo{width:35px;height:35px;flex-basis:35px}.admin-main-header{gap:8px}.admin-main-header .brand-name{font-size:11px}}
+
+
+.brand-kit-preview{border:1px solid rgba(233,188,118,.3);border-radius:21px;overflow:hidden;background:#080a0f;padding:18px 8px;box-shadow:0 18px 45px rgba(0,0,0,.18)}
+.brand-kit-preview img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain}
+.brand-kit-actions{display:flex;flex-direction:column;gap:10px;margin:18px 0 23px}
+.brand-kit-small{border:1px solid var(--stroke);border-radius:19px;background:var(--surface);padding:17px;display:flex;gap:15px;align-items:center}
+.brand-kit-small img{width:72px;height:72px;flex:0 0 72px;border-radius:17px}
+.brand-kit-small p{color:var(--muted);font-size:12px;line-height:1.65}
+html[data-theme="light"] .brand-kit-preview{box-shadow:0 10px 35px rgba(50,63,88,.08)}
