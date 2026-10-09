@@ -121,3 +121,39 @@
 .admin-row{min-width:0;gap:11px}
 .admin-row>.btn{flex:0 0 auto}
 .admin-row .badge{margin-left:4px}
+
+
+/* AFGLION 3: admin slide-out sidebar and calm accordion settings */
+.admin-drawer-shade{position:fixed;inset:0;background:rgba(2,5,10,.7);z-index:75;backdrop-filter:blur(3px)}
+.admin-drawer{position:fixed;top:0;bottom:0;left:0;z-index:76;width:min(310px,85vw);background:#111923;border-right:1px solid rgba(229,187,120,.18);box-shadow:15px 0 75px rgba(0,0,0,.34);overflow-y:auto;padding:24px 17px calc(30px + env(safe-area-inset-bottom));animation:adminDrawerIn .23s ease}
+@keyframes adminDrawerIn{from{transform:translateX(-35px);opacity:.7}to{transform:translateX(0);opacity:1}}
+.admin-drawer-top{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:5px 3px 23px;border-bottom:1px solid rgba(255,255,255,.09);margin-bottom:21px}
+.admin-drawer-top h3{font-size:19px;letter-spacing:-.03em;margin:6px 0 0;color:white}
+.admin-nav-group{margin-bottom:18px}
+.admin-nav-group-title{color:#8691a3;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.16em;margin:0 10px 11px}
+.admin-side-link{display:flex;align-items:center;width:100%;gap:12px;text-align:left;border:0;background:transparent;color:#aeb8c8;padding:13px 11px;border-radius:13px;font-size:13px;font-weight:800}
+.admin-side-link svg{width:18px;height:18px}
+.admin-side-link>span:nth-child(2){flex:1}
+.admin-side-link.active{color:#f5d99c;background:linear-gradient(110deg,#383020,#22252c);border:1px solid rgba(233,192,124,.23)}
+.admin-link-current{width:6px;height:6px;border-radius:100%;background:#f5d99c}
+.admin-drawer-foot{margin-top:27px;text-align:center;color:#81899a;font-size:10px;letter-spacing:.09em}
+.admin-setting-groups{display:flex;flex-direction:column;gap:12px}
+.admin-section{border-radius:18px;overflow:hidden;background:var(--surface);border:1px solid var(--stroke)}
+.admin-section summary{display:flex;gap:12px;align-items:center;list-style:none;cursor:pointer;padding:18px 16px;color:var(--text);font-size:13px;font-weight:800}
+.admin-section summary::-webkit-details-marker{display:none}
+.admin-section summary>svg{color:var(--gold);width:20px;height:20px}
+.admin-section summary span{margin-left:auto;color:var(--gold);font-size:17px;transition:transform .15s}
+.admin-section[open] summary span{transform:rotate(180deg)}
+.admin-section[open] summary{border-bottom:1px solid var(--stroke)}
+.admin-section-body{padding:0 16px 18px}
+.admin-section-body .form-label{margin-top:16px}
+.admin-section-body .inline-fields>div{min-width:0}
+.admin-section-body .field{min-width:0}
+.admin-save-dock{position:sticky;bottom:6px;margin:20px 0 12px;z-index:8;border-radius:18px;background:linear-gradient(180deg,transparent,var(--bg) 30%);padding:13px 0 2px}
+.admin-balance-overview{margin:12px 0;padding:17px;border-radius:17px;border:1px solid rgba(228,190,120,.18);background:linear-gradient(145deg,#3b3429,#1c2631)}
+.admin-balance-overview small{font-size:11px;color:#c6b59f;display:block}
+.admin-balance-overview strong{font-size:25px;color:#f6d69e;display:block;margin-top:7px}
+.payment-intro{display:flex;gap:11px;align-items:flex-start;margin:8px 0 16px;font-size:11px;color:var(--muted);line-height:1.65}
+.payment-intro svg{color:var(--gold);margin-top:2px}
+.modal .form-label{margin-top:15px}
+@media(max-width:370px){.hero-foot{gap:6px}.hero-stamp{max-width:52%;font-size:8px;padding:6px}.admin-section-body{padding:0 12px 15px}.admin-context h1{font-size:24px}.admin-row{flex-wrap:wrap}}
