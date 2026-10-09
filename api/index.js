@@ -301,12 +301,12 @@ async function route(req){
  }
  if(roleRank(role)===0)fail(403,'Administrator access required');
  if(action==='adminData'){
-  const [us,rs,m,ss,total]=await Promise.all([
+  const [us,rs,m,ss,total,staffSnap]=await Promise.all([
    users.orderBy('joinedAt','desc').limit(500).get(),store.collection(C.requests).where('status','==','pending').limit(200).get(),
-   store.collection(C.money).where('status','==','pending').limit(200).get(),settingRef.get(),users.count().get()
+   store.collection(C.money).where('status','==','pending').limit(200).get(),settingRef.get(),users.count().get(),store.collection(C.roles).limit(100).get()
   ]);
   const members=us.docs.map(d=>({...d.data(),id:d.id})), moneyRequests=m.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt);
-  return {callerRole:role,users:members,requests:rs.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt),moneyRequests,settings:settings(ss),
+  return {callerRole:role,staffRoles:staffSnap.docs.map(d=>({id:d.id,role:d.data().role})),rootOwners:role==='owner'?[...admins()]:[],users:members,requests:rs.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt),moneyRequests,settings:settings(ss),
    stats:{members:total.data().count,vip:members.filter(u=>u.vipUntil>Date.now()).length,pending:rs.size+moneyRequests.length,points:members.reduce((sum,u)=>sum+(u.balance||0),0)},sampled:members.length<total.data().count};
  }
  if(action==='adminAction'){
