@@ -9,7 +9,7 @@ const admin = require('firebase-admin');
 const DAY = 86400000;
 const C = {
  users:'veloraUsers', settings:'veloraSettings', requests:'veloraVipRequests',
- money:'veloraMoneyRequests', awards:'veloraReferralAwards'
+ money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit'
 };
 const DEFAULTS = {
  appName:'AFGLION', botUsername:'Afglionbot',
@@ -39,6 +39,12 @@ function db(){
 }
 function admins(){return new Set((process.env.ADMIN_TELEGRAM_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));}
 function secureString(x,max){return typeof x==='string'?x.trim().slice(0,max):'';}
+async function roleOf(id,store){
+ if(admins().has(String(id)))return 'owner';
+ const record=await store.collection(C.roles).doc(String(id)).get();
+ return record.exists&&['admin','owner'].includes(record.data().role)?record.data().role:'user';
+}
+function roleRank(role){return role==='owner'?2:role==='admin'?1:0;}
 function numericId(x){return /^\d{3,20}$/.test(String(x||''));}
 function whole(x,min,max){return typeof x==='number'&&Number.isSafeInteger(x)&&x>=min&&x<=max;}
 function checkAmount(x,min,max){if(!whole(x,min,max))fail(400,'Invalid AFN amount');return x;}
@@ -66,9 +72,9 @@ function safePackage(value){
  return {name,price:checkAmount(value.price,1,1000000),
   dailyReward:checkAmount(value.dailyReward,0,100000),days:checkAmount(value.days,1,365),enabled:value.enabled!==false};
 }
-async function memberStatus(id,config){
+async function memberStatus(id,config,role='user'){
  const url=channelUrl(config.forceJoinChannel);
- if(!config.forceJoinEnabled||isAdmin(id))return {joined:true,url};
+ if(!config.forceJoinEnabled||roleRank(role)>0||admins().has(id))return {joined:true,url};
  const userName=url.split('/').pop();
  let response,answer;
  try{
@@ -122,16 +128,17 @@ function telegramIdentity(raw){
  if(!Number.isSafeInteger(u.id)||u.id<=0)fail(401,'Invalid Telegram user');
  return {id:String(u.id),user:u,startParam:qs.get('start_param')||''};
 }
-function visibleUser(value,id){
- const user={...value,id:String(id),isAdmin:admins().has(String(id))};
+function visibleUser(value,id,role='user'){
+ const user={...value,id:String(id),isAdmin:roleRank(role)>0,adminRole:role};
  if((user.vipUntil||0)+DAY<Date.now()){user.vipTier='free';}
  return user;
 }
 async function signedIn(req,store){
- const id=verifySession(req),ref=store.collection(C.users).doc(id),snap=await ref.get();
+ const id=verifySession(req),ref=store.collection(C.users).doc(id);
+ const [snap,role]=await Promise.all([ref.get(),roleOf(id,store)]);
  if(!snap.exists)fail(401,'User not found');
  if(snap.data().banned)fail(403,'Account restricted');
- return {id,ref,snap};
+ return {id,ref,snap,role};
 }
 function planFor(s,tier){const p=s.vipPackages[tier];if(!p||p.enabled===false||!whole(p.price,1,1000000)||!whole(p.dailyReward,0,100000)||!whole(p.days,1,365))fail(400,'VIP package is unavailable');return p;}
 function isAdmin(id){return admins().has(id);}
@@ -145,7 +152,7 @@ async function route(req){
   if(req.method!=='POST')fail(405,'POST required');
   const tele=telegramIdentity(body.initData),id=tele.id,userRef=users.doc(id);
   const st=settings(await settingRef.get());
-  const membership=await memberStatus(id,st);
+  const membership=await memberStatus(id,st,await roleOf(id,store));
   if(!membership.joined)return {joinRequired:true,joinUrl:membership.url,joinIssue:membership.issue};
   const match=/^ref_(\d{3,20})$/.exec(tele.startParam);
   const inviter=match&&match[1]!==id?match[1]:null;
@@ -173,9 +180,9 @@ async function route(req){
   if(snapshot.data().banned)fail(403,'Account restricted');
   return {token:signSession(id)};
  }
- const {id,ref}=await signedIn(req,store);
+ const {id,ref,role}=await signedIn(req,store);
  const currentSettings=settings(await settingRef.get());
- const membership=await memberStatus(id,currentSettings);
+ const membership=await memberStatus(id,currentSettings,role);
  if(action==='joinStatus')return {joined:membership.joined,joinRequired:!membership.joined,joinUrl:membership.url,joinIssue:membership.issue};
  if(!membership.joined){
   if(action==='me')return {joinRequired:true,joinUrl:membership.url,joinIssue:membership.issue};
@@ -189,7 +196,7 @@ async function route(req){
    ref.collection('activity').orderBy('at','desc').limit(30).get()
   ]);
   const ss=settings(s);
-  return {user:visibleUser(u.data(),id),settings:ss,
+  return {user:visibleUser(u.data(),id,role),settings:ss,
    referrals:r.docs.map(d=>({id:d.id,name:d.data().name||'Member',photoUrl:d.data().photoUrl||'',joinedAt:d.data().joinedAt||0})).sort((x,y)=>y.joinedAt-x.joinedAt),
    vipRequest:v.exists?v.data():null,
    transactions:m.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>y.createdAt-x.createdAt),
@@ -285,14 +292,14 @@ async function route(req){
    return {ok:true};
   });
  }
- if(!isAdmin(id))fail(403,'Administrator access required');
+ if(roleRank(role)===0)fail(403,'Administrator access required');
  if(action==='adminData'){
   const [us,rs,m,ss,total]=await Promise.all([
    users.orderBy('joinedAt','desc').limit(500).get(),store.collection(C.requests).where('status','==','pending').limit(200).get(),
    store.collection(C.money).where('status','==','pending').limit(200).get(),settingRef.get(),users.count().get()
   ]);
   const members=us.docs.map(d=>({...d.data(),id:d.id})), moneyRequests=m.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt);
-  return {users:members,requests:rs.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt),moneyRequests,settings:settings(ss),
+  return {callerRole:role,users:members,requests:rs.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt),moneyRequests,settings:settings(ss),
    stats:{members:total.data().count,vip:members.filter(u=>u.vipUntil>Date.now()).length,pending:rs.size+moneyRequests.length,points:members.reduce((sum,u)=>sum+(u.balance||0),0)},sampled:members.length<total.data().count};
  }
  if(action==='adminAction'){
@@ -331,10 +338,28 @@ async function route(req){
     return {ok:true};
    });
   }
+  if(type==='setRole'){
+   if(role!=='owner')fail(403,'Only owners can appoint or remove administrators and owners');
+   const targetId=String(body.userId||''),newRole=String(body.role||'');
+   if(!numericId(targetId)||!['user','admin','owner'].includes(newRole))fail(400,'Invalid role assignment');
+   if(admins().has(targetId)&&newRole!=='owner')fail(403,'Environment owner cannot be demoted');
+   const targetRef=users.doc(targetId),roleRef=store.collection(C.roles).doc(targetId);
+   await store.runTransaction(async tx=>{
+    const target=await tx.get(targetRef);
+    if(!target.exists)fail(404,'Account has not signed into the Mini App yet');
+    if(target.data().banned&&newRole!=='user')fail(409,'Unban the account before granting staff role');
+    if(newRole==='user')tx.delete(roleRef);
+    else tx.set(roleRef,{role:newRole,appointedBy:id,updatedAt:now});
+    tx.set(store.collection(C.audits).doc(),{actor:id,kind:'role',target:targetId,role:newRole,at:now});
+   });
+   return {ok:true};
+  }
   if(type==='updateUser'){
    const targetId=String(body.userId||'');
    if(!numericId(targetId)||!(body.tier==='free'||/^[a-z0-9_-]{2,32}$/.test(body.tier))||!whole(body.addPoints,0,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
-   if(isAdmin(targetId)&&body.banned)fail(400,'Cannot ban an administrator');
+   const targetRole=await roleOf(targetId,store);
+   if(roleRank(targetRole)>0&&role!=='owner')fail(403,'Owner approval required for staff accounts');
+   if(roleRank(targetRole)>0&&body.banned)fail(400,'Staff accounts cannot be banned');
    const userRef=users.doc(targetId);
    await store.runTransaction(async tx=>{
     const u=await tx.get(userRef);
