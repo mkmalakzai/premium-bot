@@ -133,6 +133,9 @@ case 'admin-tab':state.adminTab=target.dataset.tab;renderAdmin();break;
 case 'admin-user':openUserModal(target.dataset.id);break;
 case 'admin-approve':if(confirm('Approve VIP and deduct plan price from the member wallet?'))await adminAction('approveVip',{requestId:target.dataset.id});break;
 case 'admin-reject':await adminAction('rejectVip',{requestId:target.dataset.id});break;
+case 'admin-add-package':packageModal('');break;
+case 'admin-edit-package':packageModal(target.dataset.id);break;
+case 'admin-delete-package':if(confirm('Delete this package? Active members keep their current reward terms.'))await adminAction('deleteVipPackage',{packageId:target.dataset.id});break;
 case 'admin-save-settings':saveAdminSettings();break;
 case 'admin-save-user':saveAdminUser();break;
 }});
@@ -147,10 +150,10 @@ modal(deposit?'Manual deposit':'Manual withdrawal',
 '<div class="alert">'+(deposit?'Send the screenshot to @'+esc(contact)+' and submit this request. Balance updates after admin review.':'Funds are reserved during manual review.')+'</div>'+
 '<button class="btn btn-primary btn-block" style="margin-top:14px">Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');}
 
-document.addEventListener('submit',async function(e){if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var method=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,method:method,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
+document.addEventListener('submit',async function(e){if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var method=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,method:method,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
 async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();}catch(e){toast(e.message);state.page='profile';render();}}
 
-function adminTabs(){return '<div class="admin-tabs">'+[['overview','Overview'],['users','Members'],['requests','VIP'],['money','Payments'],['settings','Settings']].map(function(t){return '<button class="admin-tab '+(state.adminTab===t[0]?'active':'')+'" data-action="admin-tab" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';}
+function adminTabs(){return '<div class="admin-tabs">'+[['overview','Overview'],['users','Members'],['requests','VIP'],['packages','Packages'],['money','Payments'],['settings','Settings']].map(function(t){return '<button class="admin-tab '+(state.adminTab===t[0]?'active':'')+'" data-action="admin-tab" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';}
 function adminUserRows(users){return users.length?users.map(function(u){return '<div class="admin-row"><div style="min-width:0"><strong>'+esc(u.name||'Member')+'</strong> '+(u.banned?'<span class="badge red">BANNED</span>':'')+'<small>ID '+esc(u.id)+' · '+currency(u.balance)+' · '+esc(u.vipTier||'free')+'</small></div><button class="btn btn-ghost btn-small" data-action="admin-user" data-id="'+esc(u.id)+'">Manage</button></div>';}).join(''):empty('users','No members found','No matching members.');}
 function adminNumber(label,id,value,min,max){return '<div><label class="form-label">'+esc(label)+'</label><input class="field" id="'+id+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+n(value).replace(/,/g,'')+'" required></div>';}
 function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div class="body-sub">Loading admin...</div>';return;}
@@ -159,30 +162,66 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  if(tab==='users')html+='<input id="admin-search" class="field" placeholder="Search name or Telegram ID" aria-label="Search members"><div id="admin-users">'+adminUserRows(a.users)+'</div>';
  if(tab==='requests')html+=a.requests.length?a.requests.map(function(req){return '<div class="admin-row"><div><strong>'+esc(req.name||req.userId)+'</strong> <span class="badge">'+esc(req.tier.toUpperCase())+'</span><small>'+currency(req.price)+' · '+fmtDate(req.createdAt)+'</small></div><div class="mini-actions"><button class="btn btn-primary btn-small" data-action="admin-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';}).join(''):empty('check','No VIP requests','You have no VIP purchases to review.');
  if(tab==='money')html+=(a.moneyRequests||[]).length?a.moneyRequests.map(function(req){return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'⬇ Deposit':'⬆ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div><p><b>'+esc(req.name)+'</b> · ID '+esc(req.userId)+'</p><p>Method: '+esc(req.method)+'</p><p>Reference / Details: '+esc(req.details)+'</p><small>'+fmtDate(req.createdAt)+'</small><div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';}).join(''):empty('check','No payment requests','Deposits and withdrawals awaiting review will appear here.');
- if(tab==='settings'){var st=a.settings,gs=st.plans.gold,es=st.plans.elite;
- html+='<label class="form-label">Announcement</label><textarea id="admin-announcement" class="field" maxlength="350">'+esc(st.announcement||'')+'</textarea>'+
- '<div class="inline-fields">'+adminNumber('Free check-in (AFN)','admin-daily',st.dailyBonus,0,1000)+adminNumber('VIP referral %','admin-referral',st.referralPercent,0,50)+'</div>'+
- section('Gold VIP')+'<div class="inline-fields">'+adminNumber('Price (AFN)','gold-price',gs.price,1,1000000)+adminNumber('Daily (AFN)','gold-daily',gs.dailyReward,0,100000)+'</div>'+adminNumber('Duration (days)','gold-days',gs.days,1,365)+
- section('Elite VIP')+'<div class="inline-fields">'+adminNumber('Price (AFN)','elite-price',es.price,1,1000000)+adminNumber('Daily (AFN)','elite-daily',es.dailyReward,0,100000)+'</div>'+adminNumber('Duration (days)','elite-days',es.days,1,365)+
- section('Manual payments')+'<div class="inline-fields">'+adminNumber('Minimum deposit','admin-min-deposit',st.minDeposit,1,100000)+adminNumber('Minimum withdraw','admin-min-withdraw',st.minWithdraw,1,100000)+'</div>'+
- '<label class="form-label">Deposit instructions</label><textarea class="field" id="admin-deposit-inst" maxlength="500">'+esc(st.depositInstructions||'')+'</textarea>'+
- '<label class="form-label">Payout instructions</label><textarea class="field" id="admin-payout-inst" maxlength="500">'+esc(st.payoutInstructions||'')+'</textarea>'+
- '<label class="form-label">Bot username (without @)</label><input class="field" id="admin-bot" value="'+esc(st.botUsername||'Afglionbot')+'"><button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-settings">Save all settings</button>';
+ if(tab==='packages'){
+  var packages=a.settings.vipPackages||a.settings.plans||{};
+  html+='<button class="btn btn-primary btn-block" data-action="admin-add-package">'+icon('crown')+' Create new VIP package</button>'+
+  '<p class="body-sub" style="margin-top:14px">Create unlimited custom options (up to 20 active records); each purchase keeps its approved plan terms.</p>'+
+  Object.keys(packages).map(function(key){var p=packages[key];return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(p.name)+'</b><small>'+currency(p.price)+' · '+currency(p.dailyReward)+'/day · '+n(p.days)+' days</small></div><span class="badge">'+(p.enabled===false?'HIDDEN':'ACTIVE')+'</span></div><div class="package-manage-actions"><button class="btn btn-outline btn-small" data-action="admin-edit-package" data-id="'+esc(key)+'">'+icon('edit')+' Edit</button><button class="btn btn-ghost btn-small" data-action="admin-delete-package" data-id="'+esc(key)+'">Delete</button></div></div>';}).join('');
  }
+ if(tab==='settings'){var st=a.settings;
+ html+='<label class="form-label">Announcement</label><textarea id="admin-announcement" class="field" maxlength="350">'+esc(st.announcement||'')+'</textarea>'+
+ section('Join requirement')+'<label class="check-row"><input type="checkbox" id="admin-force-enabled" '+(st.forceJoinEnabled?'checked':'')+'> Require channel membership before app access</label>'+
+ '<label class="form-label">Required Telegram channel (public URL)</label><input class="field" id="admin-force-channel" value="'+esc(st.forceJoinChannel||'https://t.me/geminipromtshub')+'">'+
+ '<p class="muted-note">Important: @Afglionbot must be an administrator in the required channel to verify joined members.</p>'+
+ section('Home channel button')+'<label class="form-label">Telegram channel link displayed on Home</label><input class="field" id="admin-home-channel" value="'+esc(st.homeChannelUrl||'https://t.me/geminipromtshub')+'">'+
+ section('Free daily check-in')+'<label class="check-row"><input type="checkbox" id="admin-daily-enabled" '+(st.dailyEnabled?'checked':'')+'> Show free daily rewards on Home</label>'+
+ '<div class="inline-fields">'+adminNumber('Free daily reward (AFN)','admin-daily',st.dailyBonus,0,1000)+adminNumber('VIP referral commission %','admin-referral',st.referralPercent,0,50)+'</div>'+
+ section('Manual deposit instructions')+'<label class="form-label">Receiving number</label><input class="field" id="admin-deposit-number" maxlength="40" placeholder="Enter your payment number" value="'+esc(st.depositNumber||'')+'">'+
+ '<label class="form-label">Screenshot recipient (Telegram username)</label><input class="field" id="admin-deposit-contact" value="'+esc(st.depositContact||'Mk_Malakzai')+'">'+
+ '<label class="form-label">Deposit instructions</label><textarea class="field" id="admin-deposit-inst" maxlength="500">'+esc(st.depositInstructions||'')+'</textarea>'+
+ section('Withdrawal instructions')+'<label class="form-label">Payout instructions</label><textarea class="field" id="admin-payout-inst" maxlength="500">'+esc(st.payoutInstructions||'')+'</textarea>'+
+ '<div class="inline-fields">'+adminNumber('Minimum deposit (AFN)','admin-min-deposit',st.minDeposit,1,100000)+adminNumber('Minimum withdrawal','admin-min-withdraw',st.minWithdraw,1,100000)+'</div>'+
+ '<label class="form-label">Bot username</label><input class="field" id="admin-bot" value="'+esc(st.botUsername||'Afglionbot')+'"><button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-settings">Save all settings</button>';
+ }
+
  root.className='app-shell admin-shell';root.innerHTML=html+footer()+'</div>';
  var search=document.getElementById('admin-search');if(search)search.addEventListener('input',function(){var q=search.value.toLowerCase().trim();document.getElementById('admin-users').innerHTML=adminUserRows(a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}));});
  window.scrollTo({top:0,behavior:'smooth'});
 }
-function openUserModal(id){var u=state.admin.users.find(function(x){return x.id===id;});if(!u)return;modal('Manage member','<div class="user-row" style="margin-top:16px">'+avatar(u)+'<div class="user-main"><strong>'+esc(u.name)+'</strong><small>ID '+esc(u.id)+'</small></div></div><label class="form-label">VIP access</label><select class="field" id="user-tier"><option value="free" '+(u.vipTier==='free'?'selected':'')+'>Free</option><option value="gold" '+(u.vipTier==='gold'?'selected':'')+'>Gold</option><option value="elite" '+(u.vipTier==='elite'?'selected':'')+'>Elite</option></select><label class="form-label">Credit AFN (0 to skip)</label><input class="field" id="user-points" type="number" min="0" max="100000" step="1" value="0"><label class="form-label">Account status</label><select class="field" id="user-ban"><option value="false" '+(!u.banned?'selected':'')+'>Active</option><option value="true" '+(u.banned?'selected':'')+'>Banned</option></select><button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-user" data-id="'+esc(u.id)+'">Save changes</button>');}
+function openUserModal(id){var u=state.admin.users.find(function(x){return x.id===id;});if(!u)return;
+var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{};
+var tierOptions='<option value="free" '+(u.vipTier==='free'?'selected':'')+'>Free</option>'+
+ Object.keys(packages).map(function(key){return '<option value="'+esc(key)+'" '+(u.vipTier===key?'selected':'')+'>'+esc(packages[key].name)+'</option>';}).join('');
+if(u.vipTier!=='free'&&!packages[u.vipTier])tierOptions+='<option value="'+esc(u.vipTier)+'" selected>Legacy · '+esc(u.vipTier)+'</option>';
+modal('Manage member','<div class="user-row" style="margin-top:16px">'+avatar(u)+'<div class="user-main"><strong>'+esc(u.name)+'</strong><small>ID '+esc(u.id)+'</small></div></div><label class="form-label">VIP access</label><select class="field" id="user-tier">'+tierOptions+'</select><label class="form-label">Credit AFN (0 to skip)</label><input class="field" id="user-points" type="number" min="0" max="100000" step="1" value="0"><label class="form-label">Account status</label><select class="field" id="user-ban"><option value="false" '+(!u.banned?'selected':'')+'>Active</option><option value="true" '+(u.banned?'selected':'')+'>Banned</option></select><button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-user" data-id="'+esc(u.id)+'">Save changes</button>');}
+
 async function saveAdminUser(){var el=document.querySelector('[data-action="admin-save-user"]');if(!el)return;await adminAction('updateUser',{userId:el.dataset.id,tier:document.getElementById('user-tier').value,addPoints:Number(document.getElementById('user-points').value),banned:document.getElementById('user-ban').value==='true'});}
 function getNum(id){return Number(document.getElementById(id).value);}
 async function saveAdminSettings(){await adminAction('saveSettings',{
- announcement:document.getElementById('admin-announcement').value,dailyBonus:getNum('admin-daily'),referralPercent:getNum('admin-referral'),
+ announcement:document.getElementById('admin-announcement').value,
+ dailyBonus:getNum('admin-daily'),dailyEnabled:document.getElementById('admin-daily-enabled').checked,
+ referralPercent:getNum('admin-referral'),
+ forceJoinEnabled:document.getElementById('admin-force-enabled').checked,
+ forceJoinChannel:document.getElementById('admin-force-channel').value.trim(),
+ homeChannelUrl:document.getElementById('admin-home-channel').value.trim(),
+ depositNumber:document.getElementById('admin-deposit-number').value.trim(),
+ depositContact:document.getElementById('admin-deposit-contact').value.trim(),
  minDeposit:getNum('admin-min-deposit'),minWithdraw:getNum('admin-min-withdraw'),
  botUsername:document.getElementById('admin-bot').value.trim().replace(/^@/,''),
- depositInstructions:document.getElementById('admin-deposit-inst').value,payoutInstructions:document.getElementById('admin-payout-inst').value,
- plans:{gold:{price:getNum('gold-price'),dailyReward:getNum('gold-daily'),days:getNum('gold-days')},elite:{price:getNum('elite-price'),dailyReward:getNum('elite-daily'),days:getNum('elite-days')}}
+ depositInstructions:document.getElementById('admin-deposit-inst').value,
+ payoutInstructions:document.getElementById('admin-payout-inst').value
 });}
+function packageModal(key){var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{},p=key?packages[key]:null;
+if(key&&!p)return toast('VIP package not found');
+modal(key?'Edit VIP package':'Create VIP package',
+ '<form id="package-form" data-id="'+esc(key||'')+'"><label class="form-label">Package name</label><input class="field" id="package-name" maxlength="45" minlength="3" value="'+esc(p&&p.name||'')+'" placeholder="e.g. Diamond VIP" required>'+
+ '<div class="inline-fields"><div><label class="form-label">Price (AFN)</label><input class="field" id="package-price" type="number" min="1" max="1000000" step="1" value="'+(p?p.price:500)+'" required></div><div><label class="form-label">Daily reward (AFN)</label><input class="field" id="package-daily" type="number" min="0" max="100000" step="1" value="'+(p?p.dailyReward:50)+'" required></div></div>'+
+ '<label class="form-label">Duration in days</label><input class="field" id="package-days" type="number" min="1" max="365" step="1" value="'+(p?p.days:30)+'" required>'+
+ '<label class="form-label">Visibility</label><select class="field" id="package-enabled"><option value="yes" '+(!p||p.enabled!==false?'selected':'')+'>Visible to users</option><option value="no" '+(p&&p.enabled===false?'selected':'')+'>Hidden</option></select>'+
+ '<div class="alert">Changing a package will not change rewards already approved for existing members.</div>'+
+ '<button class="btn btn-primary btn-block" style="margin-top:20px">Save VIP package</button></form>');
+}
+
 async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast('Changes saved');}catch(e){toast(e.message);}finally{state.loading=false;}}
 
 init();
