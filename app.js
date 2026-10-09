@@ -47,7 +47,7 @@ function nav(){return '<nav class="bottom-nav" aria-label="Main navigation">'+[
 ].map(function(v){return '<button class="nav-item '+(state.page===v[0]?'active':'')+'" data-page="'+v[0]+'" aria-label="'+v[2]+'">'+icon(v[1])+'<span>'+v[2]+'</span></button>';}).join('')+'</nav>';}
 
 function currency(v){return n(v)+' AFN';}
-function activePlan(){var u=user(),p=(data().settings.plans||{})[u.vipTier];return p&&u.vipUntil>Date.now()-86400000?p:null;}
+function activePlan(){var u=user(),p=u.vipPlanSnapshot||(data().settings.plans||{})[u.vipTier];return p&&u.vipUntil>Date.now()-86400000?p:null;}
 function vipSlot(){var u=user(),p=activePlan();return p&&u.vipActivatedAt?Math.min(p.days,Math.floor((Date.now()-u.vipActivatedAt)/86400000)):0;}
 function vipCanClaim(){var u=user(),p=activePlan(),slot=vipSlot();return !!(p&&slot>=1&&slot>(u.vipLastClaimSlot||0)&&(u.vipDaysClaimed||0)<p.days&&Date.now()<=u.vipUntil+86400000);}
 function hero(){var u=user();return '<div class="hero"><div class="hero-label">AVAILABLE BALANCE</div><div class="hero-amount">'+n(u.balance)+' <span class="hero-unit">AFN</span></div><div style="font-size:11px;opacity:.78;font-weight:700">Your secure in-app wallet</div><div class="hero-foot"><div class="hero-tag"><span></span> MANUAL PAYMENTS</div><div class="hero-stamp">'+esc((u.vipTier||'free').toUpperCase())+' MEMBER</div></div></div>';}
@@ -99,11 +99,11 @@ async function init(){try{if(tg){tg.ready();tg.expand();tg.setHeaderColor('#090c
   catch(e){state.data=demoData;state.demo=true;render();document.querySelector('.alert').textContent='Setup or sign-in required: '+e.message+'. This preview does not save data.';}
 }
 async function run(action,payload,success){if(state.demo){toast('Preview mode · Live features require Telegram and Firebase setup');return null;}if(state.loading)return null;state.loading=true;try{var out=await api(action,payload);if(success)toast(success);await refresh();return out;}catch(e){toast(e.message);return null;}finally{state.loading=false;}}
-function link(){var s=data().settings;return s.botUsername?'https://t.me/'+s.botUsername+'?startapp=ref_'+user().id:'';}
+function link(){var s=data().settings;return !state.demo&&s.botUsername?'https://t.me/'+s.botUsername+'?startapp=ref_'+user().id:'';}
 async function copyValue(value){try{await navigator.clipboard.writeText(value);toast('Copied to clipboard');}catch(e){var box=document.createElement('textarea');box.value=value;document.body.appendChild(box);box.select();document.execCommand('copy');box.remove();toast('Copied');}}
 function modal(title,inner){closeModal();var el=document.createElement('div');el.className='modal-backdrop';el.id='modal-layer';el.innerHTML='<div class="modal" role="dialog" aria-modal="true"><div class="modal-header"><h2>'+title+'</h2><button class="close-modal" data-action="close-modal" aria-label="Close">×</button></div>'+inner+'</div>';document.body.appendChild(el);el.addEventListener('click',function(e){if(e.target===el)closeModal();});}
 function closeModal(){var el=document.getElementById('modal-layer');if(el)el.remove();}
-function historyModal(){var acts=data().activity||[];modal('Activity history',acts.length?'<div class="user-list" style="margin-top:18px">'+acts.map(function(a){return '<div class="user-row"><div class="action-icon">'+icon('bolt')+'</div><div class="user-main"><strong>'+esc(a.label)+'</strong><small>'+fmtDate(a.at)+'</small></div><div class="user-end">'+(a.amount>=0?'+':'')+n(a.amount)+' PTS</div></div>';}).join('')+'</div>':empty('clock','No activity yet','Your rewards and account changes will appear here.'));}
+function historyModal(){var acts=data().activity||[];modal('Activity history',acts.length?'<div class="user-list" style="margin-top:18px">'+acts.map(function(a){return '<div class="user-row"><div class="action-icon">'+icon('bolt')+'</div><div class="user-main"><strong>'+esc(a.label)+'</strong><small>'+fmtDate(a.at)+'</small></div><div class="user-end">'+(a.amount>=0?'+':'')+n(a.amount)+' AFN</div></div>';}).join('')+'</div>':empty('clock','No activity yet','Your rewards and account changes will appear here.'));}
 document.addEventListener('click',async function(e){var target=e.target.closest('[data-action],[data-page]');if(!target)return;if(target.dataset.page){go(target.dataset.page);return;}var action=target.dataset.action;
 switch(action){
 
@@ -121,7 +121,7 @@ case 'vip-request':var tier=target.dataset.tier,p=(data().settings.plans||{})[ti
 case 'confirm-vip':var vip=target.dataset.tier;closeModal();await run('vipRequest',{tier:vip},'VIP request sent for review');break;
 case 'edit-name':modal('Edit display name','<form id="name-form"><label class="form-label">Your name</label><input class="field" id="new-name" maxlength="48" minlength="2" value="'+esc(user().name)+'" required><button class="btn btn-primary btn-block" style="margin-top:16px">Save changes</button></form>');break;
 case 'history':historyModal();break;
-case 'help':modal('Help & information','<p class="body-sub">AFGLION is a members club experience. Earn points with daily check-ins and referrals. VIP access is manually approved by the club administrator.</p><div class="alert">Points are in-app membership rewards, not cash or withdrawable funds. VIP requests do not constitute a payment.</div>');break;
+case 'help':modal('Help & information','<p class="body-sub">AFGLION offers free daily check-ins, VIP reward claims, referral commission and an AFN wallet with manually reviewed deposits and payouts.</p><div class="alert">Deposits, withdrawals and VIP requests all require administrator approval. Daily VIP rewards are eligibility-based and are not guaranteed income. For support, contact @Afglionbot.</div>');break;
 case 'refresh':try{await refresh();toast('Account refreshed');}catch(ex){toast(ex.message);}break;
 case 'open-admin':go('admin');break;
 case 'close-modal':closeModal();break;
