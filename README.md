@@ -2,6 +2,15 @@
 
 A mobile-first HTML/CSS/JavaScript Telegram Mini App deployed on Vercel with a Firebase Cloud Firestore backend. The visual public Firebase config references the existing **afglion-47b07** project, but **all accounts and AFN balances are accessed through authenticated Vercel functions using Firebase Admin SDK**. The public Firebase web config alone does **not** activate the backend.
 
+## Final update — exact shared logo, instant VIP and channel payment updates (2026-10-09)
+
+- **Exact user-approved logo:** The existing `afglion-logo.svg` now embeds a WebP rendition derived directly from the user's approved crowned-lion image, rather than a different vector lion. It is intentionally resized for efficient Mini App use; the user's original 1254×1254 PNG remains the higher-resolution source for BotFather and Telegram channel profile images. `afglion-brand.svg` embeds the *same* image content.
+- **VIP purchases are immediate:** Purchases take the amount directly from the verified Firestore wallet in a transaction and activate the selected package instantly. There is no admin VIP approval queue for new purchases. An already-active VIP cannot be overwritten by a second purchase. Referrer commission (when eligible) is granted in the same transaction. Prior unprocessed VIP request documents remain historical; they are no longer actionable from Admin.
+- **Editable deposit admin contact:** Admin → Settings → Deposit & withdrawals → Deposit admin Telegram username. The user-facing Deposit screen opens that Telegram contact, including after it is changed. Keep the handle public and valid.
+- **Premium Telegram channel notices:** Admin → Settings → Channel payment notifications: enable automatic messages and enter a public channel link. The backend queues one notice when a manual deposit or withdrawal is **approved** (never when merely requested or rejected), then attempts a premium HTML-formatted Telegram bot post. Notices include the approved AFN amount and *masked* user identifier; they omit payment reference, phone number and wallet details.
+- **Delivery recovery:** If the Telegram API fails after a financial approval, the financial transaction stays approved and the failed notice appears under Admin → ☰ → Channel notifications with a Retry action. The bot must be an administrator with permission to post in the channel.
+- **Operator caution:** VIP payouts like 500 AFN paid for 50 AFN/day for 30 days imply a highly risky, potentially unsustainable return; do not present them as guaranteed earnings.
+
 ## Final AFGLION identity and startup (October 9, 2026)
 
 - **One consistent official lion logo:** `afglion-logo.svg` (standalone app icon) and self-contained `afglion-brand.svg` (the exact same lion crest alongside AFGLION Members Club text). Both vector assets are hosted publicly in this project and may be reused for social media, cards, website or promotion.
