@@ -108,11 +108,11 @@ section('Your invitation link')+'<div class="ref-linkbox"><span class="ref-url">
 '<button class="btn btn-outline btn-block" style="margin-top:10px" data-action="share-ref" '+(!invitation?'disabled':'')+'>'+icon('share')+' Invite via Telegram</button>'+
 section('How referrals work')+'<div class="ref-steps"><div class="step"><span class="step-num">01</span><div><div class="step-title">Share your link</div><div class="step-desc">Your friend opens AFGLION through Telegram.</div></div></div><div class="step"><span class="step-num">02</span><div><div class="step-title">Friend joins and buys VIP</div><div class="step-desc">Their wallet is funded and the administrator approves their VIP purchase.</div></div></div><div class="step"><span class="step-num">03</span><div><div class="step-title">Commission credited</div><div class="step-desc">Your AFN wallet receives the configured commission once.</div></div></div></div>'+
 section('Your referrals')+(data().referrals.length?'<div class="user-list">'+data().referrals.map(function(r){return '<div class="user-row">'+avatar(r)+'<div class="user-main"><strong>'+esc(r.name)+'</strong><small>Joined '+fmtDate(r.joinedAt)+'</small></div><div class="user-end">'+icon('check')+'</div></div>';}).join('')+'</div>':empty('users','No referrals yet','Friends who register through your link will appear here.'))+footer()+'</div>';}
-function vip(){var u=user(),st=data().settings,req=data().vipRequest,plans=st.vipPackages||st.plans||{},p=activePlan();return '<div class="view">'+goldTitle('VIP membership.','Custom VIP packages controlled by the administrator.')+
+function vip(){var u=user(),st=data().settings,plans=st.vipPackages||st.plans||{},p=activePlan();return '<div class="view">'+goldTitle('VIP membership.','Custom VIP packages controlled by the administrator.')+
 '<div class="vip-hero"><div class="eyebrow">YOUR MEMBERSHIP</div><h2>Member.<br>Premium.</h2><p>Choose the VIP package that fits you.</p><div class="vip-current"><i></i>'+esc(vipName(u))+(u.vipUntil&&u.vipTier!=='free'?' · Until '+fmtDate(u.vipUntil):'')+'</div></div>'+
 (p?'<div class="vip-progress">'+section('Your VIP rewards')+'<div class="plan-progress"><b>'+currency(p.dailyReward)+' / eligible day</b><small>'+n(u.vipDaysClaimed||0)+' claimed · '+n(p.days)+' scheduled days</small><button class="btn btn-primary btn-block" data-action="vip-claim" '+(!vipCanClaim()?'disabled':'')+'>'+(vipCanClaim()?'Claim VIP reward':'Next reward not ready')+'</button></div></div>':'')+
-section('Available VIP packages')+'<div class="tier-list">'+Object.keys(plans).filter(function(id){return plans[id].enabled!==false;}).map(function(tier){var v=plans[tier],mine=u.vipTier===tier&&u.vipUntil>Date.now(),pending=req&&req.status==='pending'&&req.tier===tier;
-return '<div class="tier '+(mine?'premium':'')+'"><div class="tier-top"><div class="tier-title"><span class="action-icon">'+icon('crown')+'</span><span>'+esc(v.name||tier.toUpperCase())+'</span></div><div class="tier-price">'+currency(v.price)+'<small>'+n(v.days)+'-day membership</small></div></div><div class="plan-big"><b>'+currency(v.dailyReward)+'</b><span>per eligible day</span></div><div class="tier-benefits"><div class="tier-feature">'+icon('check')+' '+n(v.days)+'-day schedule</div><div class="tier-feature">'+icon('check')+' Total scheduled: '+currency((v.dailyReward||0)*(v.days||0))+'</div><div class="tier-feature">'+icon('check')+' Manual admin approval</div></div><button class="btn '+(mine?'btn-ghost':'btn-primary')+' btn-block" '+(mine||pending?'disabled':'data-action="vip-request" data-tier="'+esc(tier)+'"')+'>'+(mine?'Current package':pending?'Awaiting approval':'Request '+esc(v.name))+'</button></div>';}).join('')+'</div>'+
+section('Available VIP packages')+'<div class="tier-list">'+Object.keys(plans).filter(function(id){return plans[id].enabled!==false;}).map(function(tier){var v=plans[tier],mine=u.vipTier===tier&&u.vipUntil>Date.now(),otherActive=u.vipTier!=='free'&&u.vipUntil>Date.now();
+return '<div class="tier '+(mine?'premium':'')+'"><div class="tier-top"><div class="tier-title"><span class="action-icon">'+icon('crown')+'</span><span>'+esc(v.name||tier.toUpperCase())+'</span></div><div class="tier-price">'+currency(v.price)+'<small>'+n(v.days)+'-day membership</small></div></div><div class="plan-big"><b>'+currency(v.dailyReward)+'</b><span>per eligible day</span></div><div class="tier-benefits"><div class="tier-feature">'+icon('check')+' '+n(v.days)+'-day schedule</div><div class="tier-feature">'+icon('check')+' Total scheduled: '+currency((v.dailyReward||0)*(v.days||0))+'</div><div class="tier-feature">'+icon('check')+' Instant VIP activation after wallet payment</div></div><button class="btn '+(mine?'btn-ghost':'btn-primary')+' btn-block" '+(otherActive?'disabled':'data-action="vip-request" data-tier="'+esc(tier)+'"')+'>'+(mine?'Current package':otherActive?'Current VIP still active':'Activate '+esc(v.name))+'</button></div>';}).join('')+'</div>'+
 '<div class="alert">'+icon('info')+' VIP rewards are subject to an eligibility schedule. Returns are not guaranteed.</div>'+footer()+'</div>';}
 function wallet(){var u=user(),s=data().settings,items=data().transactions||[];return '<div class="view">'+goldTitle('Your wallet.','Track available AFN funds, submitted payments and payouts.')+hero()+
 '<div class="wallet-actions"><button class="wallet-action" data-action="deposit"><span>'+icon('arrow')+'</span><b>Deposit</b><small>Manual approval</small></button><button class="wallet-action" data-action="withdraw"><span>'+icon('wallet')+'</span><b>Withdraw</b><small>Manual payout</small></button><button class="wallet-action" data-action="refresh"><span>'+icon('refresh')+'</span><b>Refresh</b><small>Get latest status</small></button></div>'+
@@ -166,11 +166,11 @@ case 'claim':await run('claim',{},'Your daily reward has arrived!');break;
 case 'notification':modal('Announcements','<div class="notice" style="margin-top:16px"><div class="notice-icon">'+icon('bell')+'</div><div><h3>Latest announcement</h3><p>'+esc(data().settings.announcement||'Welcome to AFGLION!')+'</p></div></div>');break;
 case 'copy-ref':if(link())await copyValue(link());break;
 case 'share-ref':if(link()){var url='https://t.me/share/url?url='+encodeURIComponent(link())+'&text='+encodeURIComponent('Join me on AFGLION!');if(tg&&tg.openTelegramLink)tg.openTelegramLink(url);else window.open(url,'_blank','noopener,noreferrer');}break;
-case 'vip-request':var tier=target.dataset.tier,p=(data().settings.vipPackages||data().settings.plans||{})[tier];modal('Request VIP membership','<p class="body-sub">'+esc(p&&p.name||tier.toUpperCase())+' costs '+currency(p&&p.price||0)+'. The administrator reviews this purchase and deducts its price from your available AFN wallet after approval. Deposit first if needed.</p><button class="btn btn-primary btn-block" data-action="confirm-vip" data-tier="'+esc(tier)+'">Submit VIP request</button>');break;
-case 'confirm-vip':var vip=target.dataset.tier;closeModal();await run('vipRequest',{tier:vip},'VIP request sent for review');break;
+case 'vip-request':var tier=target.dataset.tier,p=(data().settings.vipPackages||data().settings.plans||{})[tier];if(!p)return toast('Package not available');modal('Activate VIP now','<p class="body-sub"><b>'+esc(p.name)+'</b> costs <b>'+currency(p.price)+'</b> from your available AFN balance. Your VIP becomes active immediately after payment, with no approval needed.</p><div class="alert">Scheduled reward: '+currency(p.dailyReward)+' per eligible claim day for '+n(p.days)+' days. VIP returns are not guaranteed.</div><button class="btn btn-primary btn-block" data-action="confirm-vip" data-tier="'+esc(tier)+'">Pay '+currency(p.price)+' & activate</button>');break;
+case 'confirm-vip':var vip=target.dataset.tier;closeModal();await run('vipPurchase',{tier:vip},'VIP successfully activated!');break;
 case 'edit-name':modal('Edit display name','<form id="name-form"><label class="form-label">Your name</label><input class="field" id="new-name" maxlength="48" minlength="2" value="'+esc(user().name)+'" required><button class="btn btn-primary btn-block" style="margin-top:16px">Save changes</button></form>');break;
 case 'history':historyModal();break;
-case 'help':modal('Help & information','<p class="body-sub">AFGLION offers free daily check-ins, VIP reward claims, referral commission and an AFN wallet with manually reviewed deposits and payouts.</p><div class="alert">Deposits, withdrawals and VIP requests all require administrator approval. Daily VIP rewards are eligibility-based and are not guaranteed income. For support, contact @Afglionbot.</div>');break;
+case 'help':modal('Help & information','<p class="body-sub">AFGLION offers free daily check-ins, VIP reward claims, referral commission and an AFN wallet with manually reviewed deposits and payouts.</p><div class="alert">Deposits and withdrawals require administrator approval; paid VIP activates automatically. Daily VIP rewards are eligibility-based and are not guaranteed income. For support, contact @Afglionbot.</div>');break;
 case 'refresh':try{await refresh();toast('Account refreshed');}catch(ex){toast(ex.message);}break;
 case 'open-admin':go('admin');break;
 case 'close-modal':closeModal();break;
@@ -178,8 +178,7 @@ case 'back-admin':state.page='profile';render();break;
 case 'admin-toggle-nav':state.adminNavOpen=!state.adminNavOpen;renderAdmin();break;
 case 'admin-tab':state.adminTab=target.dataset.tab;state.adminNavOpen=false;renderAdmin();window.scrollTo({top:0,behavior:'smooth'});break;
 case 'admin-user':openUserModal(target.dataset.id);break;
-case 'admin-approve':if(confirm('Approve VIP and deduct plan price from the member wallet?'))await adminAction('approveVip',{requestId:target.dataset.id});break;
-case 'admin-reject':await adminAction('rejectVip',{requestId:target.dataset.id});break;
+
 case 'brand-download':downloadBrandPng(target.dataset.type);break;
 case 'brand-copy':await copyValue(location.origin+'/afglion-brand.svg');break;
 case 'admin-add-method':methodModal('');break;
@@ -246,8 +245,8 @@ async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegra
 
 var adminNavigation=[
  {group:'Main',items:[['overview','Dashboard','home'],['users','Members','users']]},
- {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings']]},
- {group:'Subscriptions',items:[['requests','VIP approvals','crown'],['packages','VIP packages','star']]},
+ {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['notices','Channel notifications','bell']]},
+ {group:'Subscriptions',items:[['packages','VIP packages','crown']]},
  {group:'Configuration',items:[['settings','Settings','settings'],['branding','Official brand kit','spark'],['staff','Staff & owners','shield']]}
 ];
 function adminLabel(key){
@@ -285,7 +284,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  section('Quick actions')+'<div class="admin-shortcuts">'+
  adminShortcut('money','Payments','Approve deposits & withdrawals','wallet')+
  adminShortcut('users','Member accounts','Balances and status','users')+
- adminShortcut('packages','VIP packages','Plans and pricing','crown')+
+ adminShortcut('packages','VIP packages','Instant activation plans','crown')+
  adminShortcut('settings','Bot settings','Rules and channels','settings')+'</div>'+
  section('New members')+adminUserRows(a.users.slice(0,5));
  }
@@ -294,12 +293,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<input id="admin-search" class="field" placeholder="Search name, username or ID" aria-label="Search members" autocomplete="off">'+
  '<div id="admin-users">'+adminUserRows(a.users)+'</div>';
  }
- if(tab==='requests'){
- html+=a.requests.length?a.requests.map(function(req){
- var p=req.planSnapshot||a.settings.vipPackages&&a.settings.vipPackages[req.tier]||{};
- return '<div class="payment-review"><div class="review-header"><b>'+esc(req.name||req.userId)+'</b><span class="badge">VIP</span></div><p>'+esc(p.name||req.tier)+' · '+currency(req.price)+'</p><small>ID '+esc(req.userId)+' · '+fmtDate(req.createdAt)+'</small><div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
- }).join(''):empty('check','All caught up','No VIP approvals are waiting.');
- }
+
  if(tab==='money'){
  html+=(a.moneyRequests||[]).length?a.moneyRequests.map(function(req){
  return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'↓ Deposit':'↑ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div>'+
