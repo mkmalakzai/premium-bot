@@ -224,23 +224,34 @@ function showMethodDestination(){var m=selectedMethod(),target=document.getEleme
  if(copy)copy.disabled=!(m&&m.number);
  if(submit)submit.disabled=!(m&&m.number);
 }
-function paymentModal(type){var st=data().settings,deposit=type==='deposit',methods=availableMethods(type==='deposit'),contact=st.depositContact||'Mk_Malakzai',valid=methods.filter(function(m){return !deposit||m.number;});
-modal(deposit?'Manual deposit':'Manual withdrawal',
-'<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
-'<form id="money-form" data-type="'+type+'">'+
-'<label class="form-label">Payment method</label><select class="field" id="money-method" required>'+
-(methods.length?methods.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+(deposit&&!m.number?' (Not configured)':'')+'</option>';}).join(''):'<option value="">No methods configured</option>')+'</select>'+
-(deposit?'<div class="deposit-destination"><small>Send your AFN payment to this number</small><strong id="payment-dest-number">'+esc(methods[0]&&methods[0].number||'Please select a configured payment method')+'</strong><button type="button" class="btn btn-outline btn-small" id="payment-copy" data-action="copy-deposit" '+(!(methods[0]&&methods[0].number)?'disabled':'')+'>'+icon('copy')+' Copy number</button></div>'+
-'<div class="deposit-steps"><b>Send payment screenshot</b><p>After your transfer, send the receipt or screenshot to the administrator and then submit the request below.</p><button type="button" class="btn btn-primary btn-block" data-action="open-link" data-url="https://t.me/'+esc(contact)+'">'+icon('external')+' Message @'+esc(contact)+'</button></div>':'')+
-'<label class="form-label">Amount in AFN (minimum '+n(deposit?st.minDeposit:st.minWithdraw)+')</label><input class="field" id="money-amount" type="number" min="'+(deposit?st.minDeposit:st.minWithdraw)+'" max="1000000" step="1" placeholder="Amount" required>'+
-'<label class="form-label">'+(deposit?'Transaction reference / sender details':'Payout phone, account or recipient details')+'</label><textarea class="field" id="money-details" minlength="5" maxlength="300" placeholder="'+(deposit?'Receipt number and sender name':'Your recipient account details')+'" required></textarea>'+
-'<div class="alert">'+(deposit?'The administrator checks your screenshot and transfer before your wallet receives funds.':'Withdrawal funds are held until admin approval or rejection.')+'</div>'+
-'<button class="btn btn-primary btn-block" id="money-submit" style="margin-top:14px" '+(deposit&&!valid.length?'disabled':'')+'>Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');}
+function paymentModal(type){
+ var st=data().settings,deposit=type==='deposit',methods=availableMethods(deposit),
+ contact=st.depositContact||'Mk_Malakzai',ready=methods.some(function(m){return !deposit||m.number;});
+ modal(deposit?'Deposit AFN':'Withdraw AFN',
+ '<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
+ '<form id="money-form" data-type="'+type+'">'+
+ '<label class="form-label">'+(deposit?'How will you send your deposit?':'Where should we send your withdrawal?')+'</label>'+
+ '<select class="field" id="money-method" required>'+
+ (methods.length?methods.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join(''):'<option value="">Payment method unavailable</option>')+'</select>'+
+ (deposit?'<div class="deposit-destination"><small>Send your AFN payment to this receiving number</small><strong id="payment-dest-number">'+esc(methods[0]&&methods[0].number||'No receiving number is available')+'</strong>'+
+ '<button type="button" class="btn btn-outline btn-small" id="payment-copy" data-action="copy-deposit" '+(!ready?'disabled':'')+'>'+icon('copy')+' Copy number</button></div>'+
+ '<div class="deposit-steps"><b>Send the receipt screenshot</b><p>After sending your AFN payment, send the transfer screenshot to our deposit administrator.</p>'+
+ '<button type="button" class="btn btn-primary btn-block" data-action="open-link" data-url="https://t.me/'+esc(contact)+'">'+icon('external')+' Send screenshot to @'+esc(contact)+'</button></div>':'')+
+ '<label class="form-label">Amount (AFN) · Minimum '+n(deposit?st.minDeposit:st.minWithdraw)+'</label>'+
+ '<input class="field" id="money-amount" type="number" min="'+(deposit?st.minDeposit:st.minWithdraw)+'" max="1000000" step="1" placeholder="Enter whole AFN amount" required>'+
+ (deposit?
+ '<label class="form-label">Deposit transfer reference / sender name</label><textarea id="deposit-reference" class="field" minlength="5" maxlength="300" placeholder="Enter your deposit receipt number and sender name" required></textarea>':
+ '<label class="form-label">YOUR withdrawal receiving number / account</label><input id="withdraw-recipient" class="field" type="text" minlength="5" maxlength="300" placeholder="Enter your number or account to receive payment" autocomplete="off" required>'+
+ '<div class="alert">'+icon('info')+' Do not enter any deposit transaction reference. Enter only the recipient number or account where you will receive your withdrawal.</div>')+
+ '<div class="alert">'+(deposit?'Deposit is credited after the administrator verifies your transfer and screenshot.':'Your withdrawal is reserved during manual review. Check your payout number carefully.')+'</div>'+
+ '<button class="btn btn-primary btn-block" id="money-submit" style="margin-top:14px" '+(!ready?'disabled':'')+'>Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');
+}
+
 document.addEventListener('change',function(e){if(e.target&&e.target.id==='money-method')showMethodDestination();});
 
 document.addEventListener('submit',async function(e){if(e.target.id==='staff-form'){e.preventDefault();if(!confirm('Update role for this Telegram user?'))return;await adminAction('setRole',{userId:document.getElementById('staff-id').value.trim(),role:document.getElementById('staff-role').value});return;}
 if(e.target.id==='method-form'){e.preventDefault();await adminAction('savePaymentMethod',{methodId:e.target.dataset.id,method:{name:document.getElementById('method-name').value.trim(),number:document.getElementById('method-number').value.trim(),enabled:document.getElementById('method-enabled').value==='yes'}});return;}
-if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
+if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var deposit=type==='deposit',details=(deposit?document.getElementById('deposit-reference'):document.getElementById('withdraw-recipient')).value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,reference:deposit?details:'',recipient:deposit?'':details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
 async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();window.scrollTo({top:0,behavior:'smooth'});}catch(e){toast(e.message);state.page='profile';render();}}
 
 
@@ -300,12 +311,12 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'↓ Deposit':'↑ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div>'+
  '<p><b>'+esc(req.name)+'</b> · ID '+esc(req.userId)+'</p><p>Method: '+esc(req.method)+'</p>'+
  (req.receivingNumber?'<p>Receiving number: '+esc(req.receivingNumber)+'</p>':'')+
- '<p>Reference/details: '+esc(req.details)+'</p><small>'+fmtDate(req.createdAt)+'</small>'+
+ '<p>'+(req.type==='deposit'?'Deposit transfer reference: ':'Withdrawal recipient: ')+esc(req.type==='deposit'?(req.paymentReference||req.details):(req.payoutRecipient||req.details))+'</p><small>'+fmtDate(req.createdAt)+'</small>'+
  '<div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
  }).join(''):empty('check','No pending payments','New deposit and withdrawal requests will show here.');
  }
  if(tab==='notices'){
- html+='<div class="admin-callout">Approved deposits and withdrawals can automatically send premium transaction announcements to your Telegram channel. Add @Afglionbot as an administrator with posting permission.</div>'+
+ html+='<div class="admin-callout">Approved deposits and withdrawals can automatically send premium transaction announcements to your Telegram channel. Add @Afglionbot as a channel administrator with Post Messages permission. If a notification did not arrive, use Test below.</div>'+
  '<button class="btn btn-outline btn-block" data-action="admin-tab" data-tab="settings">Configure channel</button>'+
  section('Pending / failed notifications')+
  ((a.notices||[]).length?a.notices.map(function(item){return '<div class="payment-review"><div class="review-header"><b>'+esc(item.type==='deposit'?'Deposit':'Withdrawal')+' · '+currency(item.amount)+'</b><span class="badge red">'+esc(item.status||'pending')+'</span></div><p>Channel: '+esc(item.channel||'Not configured')+'</p><p>'+esc(item.lastError||'Waiting for delivery')+'</p><button class="btn btn-primary btn-small" data-action="admin-retry-notice" data-id="'+esc(item.id)+'">Retry notification</button></div>';}).join(''):empty('check','All notifications delivered','There are no messages waiting for delivery.'));
