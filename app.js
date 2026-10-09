@@ -41,7 +41,44 @@ function user(){return (state.data||demoData).user;}
 function data(){return state.data||demoData;}
 function goldTitle(title,desc){return '<div class="page-intro"><div class="eyebrow">AFGLION EXCLUSIVE</div><h1 class="page-title">'+title+'</h1><p class="body-sub">'+desc+'</p></div>';}
 function section(t,action,label){return '<div class="section-head"><h2>'+t+'</h2>'+(action?'<button class="text-button" data-action="'+action+'">'+(label||'View all')+icon('arrow')+'</button>':'')+'</div>';}
-function header(){var u=user(),picture='<span class="profile-header-fallback">'+esc((u.name||'A').charAt(0).toUpperCase())+'</span>'+(u.photoUrl?'<img class="profile-header-image" src="'+esc(u.photoUrl)+'" alt="Profile image" loading="lazy" onerror="this.remove()">':'');return '<header class="topbar"><div class="brand-wrap"><span class="brand-mark">A</span><div><div class="brand-name">AFGLION</div><div class="brand-kicker">MEMBERS CLUB</div></div></div><div class="header-tools"><button class="round-button" data-action="notification" aria-label="Notifications">'+icon('bell')+'</button><button class="avatar-button" data-page="profile" aria-label="Open profile">'+picture+'</button></div></header>';}
+
+function logoMark(extraClass){return '<span class="brand-logo-frame '+(extraClass||'')+'"><img src="/afglion-logo.svg" width="46" height="46" alt="AFGLION lion logo" loading="eager"></span>';}
+var splashStarted=Date.now(),splashProgress=8,splashInterval=null,splashWatchdog=null,splashFinished=false;
+function splashElements(){return {loader:document.getElementById('afg-loader'),fill:document.getElementById('afg-loading-fill'),percent:document.getElementById('afg-loading-percent'),status:document.getElementById('afg-loading-status')};}
+function splashStage(label,target){
+ var elements=splashElements();
+ if(label&&elements.status)elements.status.textContent=label;
+ if(typeof target==='number')splashProgress=Math.max(splashProgress,Math.min(target,92));
+ if(elements.fill)elements.fill.style.width=splashProgress+'%';
+ if(elements.percent)elements.percent.textContent=Math.round(splashProgress)+'%';
+}
+function startSplash(){
+ splashStarted=Date.now();splashFinished=false;
+ splashStage('Preparing your experience',8);
+ splashInterval=setInterval(function(){
+  if(splashFinished)return;
+  if(splashProgress<86){splashProgress+=splashProgress<42?3:splashProgress<70?1.4:.4;splashStage('',splashProgress);}
+ },160);
+ splashWatchdog=setTimeout(function(){finishSplash();},14000);
+}
+function finishSplash(){
+ if(splashFinished)return;
+ splashFinished=true;
+ clearInterval(splashInterval);clearTimeout(splashWatchdog);
+ var elements=splashElements();
+ if(elements.status)elements.status.textContent='Ready to explore';
+ if(elements.percent)elements.percent.textContent='100%';
+ if(elements.fill)elements.fill.style.width='100%';
+ var delay=Math.max(180,1530-(Date.now()-splashStarted));
+ setTimeout(function(){
+  if(!elements.loader)return;
+  elements.loader.classList.add('afg-loader-hide');
+  elements.loader.setAttribute('aria-hidden','true');
+  setTimeout(function(){if(elements.loader&&elements.loader.parentNode)elements.loader.parentNode.removeChild(elements.loader);},550);
+ },delay);
+}
+
+function header(){var u=user(),picture='<span class="profile-header-fallback">'+esc((u.name||'A').charAt(0).toUpperCase())+'</span>'+(u.photoUrl?'<img class="profile-header-image" src="'+esc(u.photoUrl)+'" alt="Profile image" loading="lazy" onerror="this.remove()">':'');return '<header class="topbar"><div class="brand-wrap">'+logoMark()+'<div><div class="brand-name">AFGLION</div><div class="brand-kicker">MEMBERS CLUB</div></div></div><div class="header-tools"><button class="round-button" data-action="notification" aria-label="Notifications">'+icon('bell')+'</button><button class="avatar-button" data-page="profile" aria-label="Open profile">'+picture+'</button></div></header>';}
 function nav(){return '<nav class="bottom-nav" aria-label="Main navigation">'+[
  ['home','home','Home'],['vip','crown','VIP'],['referral','users','Referral'],['profile','profile','Profile']
 ].map(function(v){return '<button class="nav-item '+(state.page===v[0]?'active':'')+'" data-page="'+v[0]+'" aria-label="'+v[2]+'">'+icon(v[1])+'<span>'+v[2]+'</span></button>';}).join('')+'</nav>';}
@@ -91,15 +128,20 @@ section('Appearance & more')+'<div class="settings-list"><button class="settings
 '<div class="muted-note" style="text-align:center;margin-top:20px">Member since '+fmtDate(u.joinedAt)+'</div>'+footer()+'</div>';}
 function footer(){return '<div class="footer-sign">✦ &nbsp; AFGLION MEMBERS CLUB &nbsp; ✦</div>';}
 
-function joinGate(){setTheme();var gate=state.gate||{joinUrl:'https://t.me/geminipromtshub'};root.className='app-shell';root.innerHTML='<header class="topbar"><div class="brand-wrap"><span class="brand-mark">A</span><div><div class="brand-name">AFGLION</div><div class="brand-kicker">MEMBERS CLUB</div></div></div></header><div class="join-screen"><div class="join-art">'+icon('users')+'</div><span class="eyebrow">ONE QUICK STEP</span><h1>Join our channel<br>to continue.</h1><p>Membership is verified through Telegram. Join the required channel to unlock AFGLION.</p><button class="btn btn-primary btn-block join-primary" data-action="open-link" data-url="'+esc(gate.joinUrl)+'">'+icon('external')+' Join channel</button><button class="btn btn-outline btn-block" data-action="check-join">'+icon('check')+' Check Joined</button><div class="alert">'+icon('shield')+' '+esc(gate.joinIssue||'After joining, tap Check Joined. The bot must be a channel administrator for reliable checks.')+'</div></div>';}
+function joinGate(){setTheme();var gate=state.gate||{joinUrl:'https://t.me/geminipromtshub'};root.className='app-shell';root.innerHTML='<header class="topbar"><div class="brand-wrap">'+logoMark()+'<div><div class="brand-name">AFGLION</div><div class="brand-kicker">MEMBERS CLUB</div></div></div></header><div class="join-screen"><div class="join-art">'+icon('users')+'</div><span class="eyebrow">ONE QUICK STEP</span><h1>Join our channel<br>to continue.</h1><p>Membership is verified through Telegram. Join the required channel to unlock AFGLION.</p><button class="btn btn-primary btn-block join-primary" data-action="open-link" data-url="'+esc(gate.joinUrl)+'">'+icon('external')+' Join channel</button><button class="btn btn-outline btn-block" data-action="check-join">'+icon('check')+' Check Joined</button><div class="alert">'+icon('shield')+' '+esc(gate.joinIssue||'After joining, tap Check Joined. The bot must be a channel administrator for reliable checks.')+'</div></div>';}
 function render(){if(state.gate){joinGate();return;}if(!state.data)state.data=demoData;var body=state.page==='home'?home():state.page==='referral'?referral():state.page==='vip'?vip():state.page==='wallet'?wallet():profile();root.className='app-shell'+(state.page==='admin'?' admin-shell':'');if(state.page==='admin'){renderAdmin();return;}setTheme();root.innerHTML=header()+(state.demo?'<div class="alert" style="margin-top:0">Preview mode · Open through Telegram for live data.</div>':'')+body+nav();}
 function go(page){if(page==='admin'){if(!user().isAdmin){toast('Admin only');return;}state.page='admin';loadAdmin();return;}if(!['home','referral','vip','profile','wallet'].includes(page))return;state.page=page;render();window.scrollTo({top:0,behavior:'smooth'});try{tg&&tg.HapticFeedback&&tg.HapticFeedback.selectionChanged();}catch(e){}}
 async function api(action,payload){var res=await fetch('/api/index?action='+encodeURIComponent(action),{method:payload?'POST':'GET',headers:{'Content-Type':'application/json','Authorization':state.token?'Bearer '+state.token:''},body:payload?JSON.stringify(payload):undefined});var json=await res.json().catch(function(){return {error:'Server unavailable'};});if(!res.ok)throw new Error(json.error||'Request failed');return json;}
-async function refresh(){if(state.demo)return;var response=await api('me');if(response.joinRequired){state.gate=response;state.data=null;render();return;}state.gate=null;state.data=response;render();}
-async function telegramLogin(){if(!tg||!tg.initData)return;var response=await api('auth',{initData:tg.initData});if(response.joinRequired){state.gate=response;render();return;}state.gate=null;state.token=response.token;sessionStorage.setItem('afglion_session',state.token);await refresh();}
-async function init(){try{if(tg){tg.ready();tg.expand();tg.setHeaderColor('#090c12');tg.setBackgroundColor('#090c12');}}catch(e){}
- if(!tg||!tg.initData){state.demo=true;render();return;}state.demo=false;
- try{await telegramLogin();}catch(e){state.data=demoData;state.demo=true;render();var alert=document.querySelector('.alert');if(alert)alert.textContent='Sign-in failed: '+e.message+'. Open from Telegram to retry.';}
+async function refresh(){if(state.demo)return;splashStage('Loading your account',71);var response=await api('me');if(response.joinRequired){state.gate=response;state.data=null;render();return;}state.gate=null;state.data=response;render();}
+async function telegramLogin(){if(!tg||!tg.initData)return;splashStage('Verifying your membership',53);var response=await api('auth',{initData:tg.initData});if(response.joinRequired){state.gate=response;render();return;}state.gate=null;state.token=response.token;sessionStorage.setItem('afglion_session',state.token);await refresh();}
+async function init(){
+ startSplash();setTheme();
+ try{if(tg){tg.ready();tg.expand();}}catch(e){}
+ if(!tg||!tg.initData){state.demo=true;render();splashStage('Preview is ready',90);finishSplash();return;}
+ state.demo=false;splashStage('Securing your Telegram sign-in',44);
+ try{await telegramLogin();splashStage('Your AFGLION experience is ready',93);}
+ catch(e){state.data=demoData;state.demo=true;render();var alert=document.querySelector('.alert');if(alert)alert.textContent='Sign-in failed: '+e.message+'. Open from Telegram to retry.';splashStage('Check your connection',93);}
+ finally{finishSplash();}
 }
 async function run(action,payload,success){if(state.demo){toast('Preview mode · Live features require Telegram and Firebase setup');return null;}if(state.loading)return null;state.loading=true;try{var out=await api(action,payload);if(success)toast(success);await refresh();return out;}catch(e){toast(e.message);return null;}finally{state.loading=false;}}
 function link(){var s=data().settings;return !state.demo&&s.botUsername?'https://t.me/'+s.botUsername+'?startapp=ref_'+user().id:'';}
