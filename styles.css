@@ -228,3 +228,52 @@ html[data-theme="light"] .admin-section summary{color:#26364b}
 html[data-theme="light"] .admin-balance-overview{background:#fff6e5;border-color:#edcb92}
 html[data-theme="light"] .admin-balance-overview small{color:#8b754d}
 html[data-theme="light"] .admin-balance-overview strong{color:#8d611e}
+
+
+/* ============================================================
+   AFGLION OFFICIAL IDENTITY — identical brand logo everywhere
+   Interactive luxury welcome & progress view, accessible fallback
+   ============================================================ */
+.brand-logo-frame{width:49px;height:49px;flex:0 0 49px;display:grid;place-items:center;border-radius:15px;overflow:hidden;background:#090d13;box-shadow:0 0 0 1px rgba(248,203,126,.15),0 9px 23px rgba(0,0,0,.12)}
+.brand-logo-frame>img{width:100%;height:100%;object-fit:contain;display:block}
+.brand-wrap{min-width:0}
+.brand-wrap>div:last-child{min-width:0}
+.startup img{margin-bottom:18px;border-radius:16px;filter:drop-shadow(0 0 15px rgba(220,163,71,.15))}
+.afg-loader{position:fixed;inset:0;z-index:950;display:flex;align-items:center;justify-content:center;overflow:hidden;isolation:isolate;background:radial-gradient(ellipse at 50% 43%,#17160f 0,#0b0e12 53%,#030508 100%);color:#f7dfb0;padding:max(30px,env(safe-area-inset-top)) 20px max(32px,env(safe-area-inset-bottom));opacity:1;transition:opacity .5s ease,visibility .5s ease}
+.afg-loader:before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 15%,rgba(236,196,124,.045) 45%,transparent 70%);animation:afgSweep 4s linear infinite;pointer-events:none}
+.afg-loader:after{content:"";position:absolute;inset:14px;border:1px solid rgba(228,183,107,.11);border-radius:18px;pointer-events:none}
+.afg-loader.afg-loader-hide{opacity:0;visibility:hidden;pointer-events:none}
+.afg-loader-light{position:absolute;border-radius:50%;pointer-events:none;filter:blur(90px);opacity:.5}
+.afg-loader-light-a{height:330px;width:330px;background:#5a3b18;left:-200px;top:12%}
+.afg-loader-light-b{height:350px;width:350px;background:#443722;right:-230px;bottom:5%}
+.afg-loader-content{width:100%;max-width:440px;display:flex;align-items:center;flex-direction:column;justify-content:center;z-index:1;margin-top:-30px}
+.afg-loader-overline{display:flex;align-items:center;gap:14px;font:800 9px "DM Sans",sans-serif;letter-spacing:.25em;color:rgba(238,209,153,.62);white-space:nowrap}
+.afg-loader-spark{height:3px;width:3px;border-radius:50%;background:#f6d9a1;box-shadow:0 0 10px #f5cd80;flex-shrink:0}
+.afg-logo-theater{position:relative;height:272px;width:272px;margin:15px auto 0;display:grid;place-items:center}
+.afg-orbit{position:absolute;border-radius:50%;pointer-events:none}
+.afg-orbit-outer{height:244px;width:244px;border:1px solid rgba(240,191,106,.28);box-shadow:0 0 25px rgba(214,155,58,.12),inset 0 0 25px rgba(232,165,74,.08);animation:afgBreathe 3.8s ease-in-out infinite}
+.afg-orbit-outer:before,.afg-orbit-outer:after{content:"";position:absolute;width:6px;height:6px;border-radius:50%;background:#ffdc90;box-shadow:0 0 15px #f4b958}
+.afg-orbit-outer:before{top:17px;left:48px}.afg-orbit-outer:after{right:28px;bottom:32px}
+.afg-orbit-inner{height:206px;width:206px;border:1px dashed rgba(240,193,123,.28);animation:afgSpin 28s linear infinite}
+.afg-orbit-point{position:absolute;width:262px;height:262px;border-radius:50%;border-top:2px solid #efc47c;border-bottom:2px solid transparent;border-left:2px solid transparent;border-right:2px solid transparent;filter:drop-shadow(0 0 7px rgba(255,191,73,.62));animation:afgSpin 5.2s linear infinite}
+.afg-logo-glow{position:absolute;width:154px;height:154px;border-radius:37px;background:#d6a459;filter:blur(38px);opacity:.18;animation:afgBreathe 3.1s ease-in-out infinite}
+.afg-loader-logo{position:relative;z-index:1;display:block;height:155px;width:155px;object-fit:contain;filter:drop-shadow(0 16px 26px rgba(0,0,0,.5));animation:afgLogoFloat 4s ease-in-out infinite}
+.afg-loader-wordmark{font:700 clamp(38px,11vw,51px)/1 "Georgia","Times New Roman",serif;letter-spacing:.08em;margin:2px 0 10px;background:linear-gradient(180deg,#fff2c6 0%,#f6d494 38%,#a97635 82%,#e2bd76 100%);background-clip:text;-webkit-background-clip:text;color:transparent;text-shadow:0 6px 34px rgba(255,204,97,.15)}
+.afg-loader-subtitle{display:flex;align-items:center;gap:14px;font:800 10px "DM Sans",sans-serif;letter-spacing:.37em;color:#dcc18f}
+.afg-loader-subtitle span{display:block;width:24px;height:1px;background:linear-gradient(90deg,transparent,#b1854a)}
+.afg-loader-subtitle span:last-child{transform:rotate(180deg)}
+.afg-loader-copy{font-size:8px;letter-spacing:.21em;text-align:center;color:rgba(219,196,163,.52);font-weight:800;margin-top:28px}
+.afg-loader-progress{width:min(310px,100%);margin-top:52px}
+.afg-loader-progress-label{display:flex;justify-content:space-between;gap:8px;color:#cab99e;font-size:10px;font-weight:700;margin-bottom:13px}
+.afg-loader-progress-label>span:last-child{color:#f7dca2;font-weight:900}
+.afg-loader-track{height:6px;border:1px solid rgba(240,199,134,.21);background:#1b1d1e;border-radius:99px;overflow:hidden;padding:1px;box-shadow:0 0 17px rgba(222,161,76,.08)}
+.afg-loader-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#926229,#f6d99c,#fff1be);box-shadow:0 0 17px rgba(255,210,118,.5);transition:width .34s cubic-bezier(.16,.76,.26,1);position:relative}
+.afg-loader-fill:after{content:"";position:absolute;right:0;top:0;bottom:0;width:28px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.82))}
+.afg-loader-footer{position:absolute;bottom:max(33px,env(safe-area-inset-bottom));font-size:9px;letter-spacing:.20em;color:rgba(228,204,157,.51);font-weight:900;display:flex;align-items:center;gap:8px}
+.afg-loader-footer-icon{color:#ecc78a;font-size:15px}
+@keyframes afgSpin{to{transform:rotate(360deg)}}
+@keyframes afgBreathe{0%,100%{opacity:.58;transform:scale(.985)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes afgLogoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes afgSweep{0%{transform:translateX(-35%)}100%{transform:translateX(35%)}}
+@media(max-width:370px){.afg-logo-theater{width:240px;height:240px}.afg-orbit-outer{width:224px;height:224px}.afg-orbit-inner{width:190px;height:190px}.afg-orbit-point{width:236px;height:236px}.afg-loader-logo{height:145px;width:145px}.afg-loader-progress{margin-top:42px}.afg-loader-overline{font-size:8px;letter-spacing:.17em}.brand-logo-frame{width:43px;height:43px;flex-basis:43px}}
+@media(prefers-reduced-motion:reduce){.afg-loader *, .afg-loader:before{animation:none!important}.afg-loader{transition:none}.afg-loader-fill{transition:none}}
