@@ -9,7 +9,7 @@ const admin = require('firebase-admin');
 const DAY = 86400000;
 const C = {
  users:'veloraUsers', settings:'veloraSettings', requests:'veloraVipRequests',
- money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit', notices:'veloraApprovalNotices'
+ money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit', notices:'veloraApprovalNotices', broadcasts:'veloraBroadcasts'
 };
 const DEFAULTS = {
  appName:'AFGLION', botUsername:'Afglionbot',
@@ -479,6 +479,60 @@ async function route(req){
   }
   // VIP purchases are automatically activated in one Firestore transaction; no manual VIP approvals.
 
+  if(type==='broadcastCreate'){
+   if(role!=='owner')fail(403,'Only owners can start broadcasts');
+   const message=secureString(body.message,1600);
+   if(message.length<10)fail(400,'Broadcast must be at least 10 characters');
+   const campaign=store.collection(C.broadcasts).doc();
+   await campaign.set({message,createdBy:id,createdAt:now,status:'running',cursor:'',processed:0,sent:0,failed:0,lockedUntil:0,doneAt:0});
+   return {ok:true,campaignId:campaign.id,processed:0,sent:0,failed:0,status:'running'};
+  }
+  if(type==='broadcastStatus'){
+   const campaignId=secureString(body.campaignId,100);
+   if(!/^[A-Za-z0-9_-]{10,100}$/.test(campaignId))fail(400,'Invalid campaign');
+   const campaign=await store.collection(C.broadcasts).doc(campaignId).get();
+   if(!campaign.exists)fail(404,'Broadcast not found');
+   return {ok:true,campaignId,...campaign.data()};
+  }
+  if(type==='broadcastStep'){
+   if(role!=='owner')fail(403,'Only owners can send broadcasts');
+   const campaignId=secureString(body.campaignId,100);
+   if(!/^[A-Za-z0-9_-]{10,100}$/.test(campaignId))fail(400,'Invalid campaign');
+   const campaignRef=store.collection(C.broadcasts).doc(campaignId);
+   const lease=await store.runTransaction(async tx=>{
+    const snap=await tx.get(campaignRef);
+    if(!snap.exists)fail(404,'Broadcast not found');
+    const c=snap.data();
+    if(c.status==='completed')return {done:true,...c};
+    if(c.lockedUntil>now)fail(409,'Another broadcast batch is in progress. Retry in 20 seconds.');
+    tx.update(campaignRef,{lockedUntil:now+45000});
+    return {done:false,...c};
+   });
+   if(lease.done)return {ok:true,status:'completed',processed:lease.processed,sent:lease.sent,failed:lease.failed,campaignId};
+   let sent=0,failed=0,processed=0,cursor=lease.cursor||'',finished=false;
+   try{
+    let query=users.orderBy(admin.firestore.FieldPath.documentId()).limit(12);
+    if(cursor)query=query.startAfter(cursor);
+    const page=await query.get();
+    for(const doc of page.docs){
+     const userId=doc.id;
+     cursor=userId;processed++;
+     try{
+      const response=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/sendMessage',{
+       method:'POST',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({chat_id:userId,text:'🦁 <b>AFGLION | MEMBERS CLUB</b>\n━━━━━━━━━━━━━━━━━━━━\n\n'+lease.message+'\n\n━━━━━━━━━━━━━━━━━━━━\n✦ <i>Official AFGLION announcement</i>',parse_mode:'HTML',disable_web_page_preview:true}),
+       signal:AbortSignal.timeout(4500)
+      });
+      const answer=await response.json();
+      if(answer.ok)sent++;else failed++;
+     }catch(e){failed++;}
+    }
+    finished=page.size<12;
+   }finally{
+    await campaignRef.update({cursor,processed:admin.firestore.FieldValue.increment(processed),sent:admin.firestore.FieldValue.increment(sent),failed:admin.firestore.FieldValue.increment(failed),lockedUntil:0,status:finished?'completed':'running',...(finished?{doneAt:Date.now()}:{})});
+   }
+   return {ok:true,campaignId,status:finished?'completed':'running',processed:lease.processed+processed,sent:lease.sent+sent,failed:lease.failed+failed};
+  }
   if(type==='testNotification'){
    const ss=settings(await settingRef.get()),channel=channelUrl(ss.notificationChannel);
    const chatId='@'+channel.split('/').pop();
