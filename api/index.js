@@ -360,13 +360,15 @@ async function route(req){
 
  if(roleRank(role)===0)fail(403,'Administrator access required');
  if(action==='adminData'){
-  const [us,rs,m,ss,total,staffSnap]=await Promise.all([
-   users.orderBy('joinedAt','desc').limit(500).get(),store.collection(C.requests).where('status','==','pending').limit(200).get(),
-   store.collection(C.money).where('status','==','pending').limit(200).get(),settingRef.get(),users.count().get(),store.collection(C.roles).limit(100).get()
+  const [us,m,ss,total,staffSnap,noticeSnap]=await Promise.all([
+   users.orderBy('joinedAt','desc').limit(500).get(),
+   store.collection(C.money).where('status','==','pending').limit(200).get(),settingRef.get(),users.count().get(),store.collection(C.roles).limit(100).get(),
+   store.collection(C.notices).orderBy('createdAt','desc').limit(60).get()
   ]);
   const members=us.docs.map(d=>({...d.data(),id:d.id})), moneyRequests=m.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt);
-  return {callerRole:role,staffRoles:staffSnap.docs.map(d=>({id:d.id,role:d.data().role})),rootOwners:role==='owner'?[...admins()]:[],users:members,requests:rs.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt),moneyRequests,settings:settings(ss),
-   stats:{members:total.data().count,vip:members.filter(u=>u.vipUntil>Date.now()).length,pending:rs.size+moneyRequests.length,points:members.reduce((sum,u)=>sum+(u.balance||0),0)},sampled:members.length<total.data().count};
+  const notices=noticeSnap.docs.filter(d=>d.data().status!=='sent').map(d=>({...d.data(),id:d.id}));
+  return {callerRole:role,staffRoles:staffSnap.docs.map(d=>({id:d.id,role:d.data().role})),rootOwners:role==='owner'?[...admins()]:[],users:members,moneyRequests,notices,settings:settings(ss),
+   stats:{members:total.data().count,vip:members.filter(u=>u.vipUntil>Date.now()).length,pending:moneyRequests.length,points:members.reduce((sum,u)=>sum+(u.balance||0),0)},sampled:members.length<total.data().count};
  }
  if(action==='adminAction'){
   if(req.method!=='POST')fail(405,'POST required');
@@ -378,10 +380,13 @@ async function route(req){
    const forceJoinChannel=channelUrl(body.forceJoinChannel),homeChannelUrl=channelUrl(body.homeChannelUrl);
    const depositNumber=secureString(body.depositNumber,40).replace(/[^\d+\-\s()]/g,'');
    const depositContact=botContact(body.depositContact);
+   const notifyApprovals=body.notifyApprovals===true;
+   const notificationChannel=body.notificationChannel?channelUrl(body.notificationChannel):'';
+   if(notifyApprovals&&!notificationChannel)fail(400,'Set a notification channel first');
    if(typeof body.dailyEnabled!=='boolean'||typeof body.forceJoinEnabled!=='boolean')fail(400,'Invalid reward or force-join settings');
    await settingRef.set({appName:'AFGLION',botUsername,announcement,dailyBonus,dailyEnabled:body.dailyEnabled,
     referralPercent,minDeposit,minWithdraw,forceJoinChannel,forceJoinEnabled:body.forceJoinEnabled,
-    homeChannelUrl,depositNumber,depositContact,
+    homeChannelUrl,depositNumber,depositContact,notifyApprovals,notificationChannel,
     depositInstructions:secureString(body.depositInstructions,500),
     payoutInstructions:secureString(body.payoutInstructions,500)},{merge:true});
    return {ok:true};
