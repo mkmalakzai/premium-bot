@@ -190,3 +190,41 @@ html[data-theme="light"] .btn-outline{background:#fffaed;color:#926425;border-co
 html[data-theme="light"] .blank-state{background:#fff;border-color:#dce3eb}
 html[data-theme="light"] .blank-state h3{color:#253449}
 html[data-theme="light"] .blank-state .round-icon{background:#fff3da}
+
+
+html[data-theme="light"] .plan-progress,html[data-theme="light"] .transaction-row{background:#fff;border-color:#e5e9f1;color:var(--text)}
+html[data-theme="light"] .transaction-main strong,html[data-theme="light"] .admin-row strong{color:var(--text)}
+html[data-theme="light"] .payment-review{background:#fff;border-color:#e4e9f0}
+html[data-theme="light"] .payment-review p{color:#39485d}
+html[data-theme="light"] .channel-banner{background:linear-gradient(120deg,#e8f1ff,#fff);border-color:#cfe0fa;color:#23405c}
+html[data-theme="light"] .join-screen h1{color:var(--text)}
+html[data-theme="light"] .join-art{background:linear-gradient(145deg,#fff4dc,#f2d5a7)}
+html[data-theme="light"] .join-art svg{color:#a2783d}
+html[data-theme="light"] .deposit-destination{background:#fff9ed;color:#3b342a;border-color:#edd6ae}
+html[data-theme="light"] .deposit-destination strong{color:#a06c2b}
+html[data-theme="light"] .deposit-steps{background:#f0f6ff;color:#213955;border-color:#d9e9fb}
+html[data-theme="light"] .deposit-steps b{color:#28435e}
+html[data-theme="light"] .admin-main-header .round-button{background:#fff;color:#24374e}
+html[data-theme="light"] .admin-menu-trigger{background:#fff;color:#24374e}
+html[data-theme="light"] .admin-context-icon{background:#f8edda;color:#a97634}
+html[data-theme="light"] .check-row{background:#fff}
+html[data-theme="light"] .vip-hero,html[data-theme="light"] .ref-visual,html[data-theme="light"] .wallet-action{color:#fff}
+html[data-theme="light"] .ref-visual *,html[data-theme="light"] .vip-hero h2{color:inherit}
+html[data-theme="light"] .settings-icon{color:#b17e3d}
+html[data-theme="light"] .footer-sign{color:#9ba5b3}
+html[data-theme="light"] .notice{background:#fff;border-color:#e1e8ee}
+html[data-theme="light"] .notice h3{color:#253449}
+html[data-theme="light"] .notice p{color:#6e7b8e}
+html[data-theme="light"] .user-list{background:#fff;border-color:#e1e7ee}
+html[data-theme="light"] .user-row{border-color:#e1e7ee;color:#263649}
+html[data-theme="light"] .admin-drawer{background:#f8f9fc;border-right-color:#d9e3ed}
+html[data-theme="light"] .admin-drawer-top{border-bottom-color:#e0e5eb}
+html[data-theme="light"] .admin-drawer-top h3{color:#29384d}
+html[data-theme="light"] .admin-nav-group-title{color:#8290a3}
+html[data-theme="light"] .admin-side-link{color:#46576e}
+html[data-theme="light"] .admin-side-link.active{color:#946826;background:#fff3dd;border-color:#e5c596}
+html[data-theme="light"] .admin-drawer-foot{color:#65748a}
+html[data-theme="light"] .admin-section summary{color:#26364b}
+html[data-theme="light"] .admin-balance-overview{background:#fff6e5;border-color:#edcb92}
+html[data-theme="light"] .admin-balance-overview small{color:#8b754d}
+html[data-theme="light"] .admin-balance-overview strong{color:#8d611e}
