@@ -1,0 +1,15 @@
+{
+  "name": "velora-telegram-mini-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Premium vanilla HTML/CSS/JS Telegram Mini App with secure Firebase Firestore and admin",
+  "scripts": {
+    "check": "node --check app.js && node --check api/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}
