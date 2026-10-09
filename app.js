@@ -133,10 +133,14 @@ case 'refresh':try{await refresh();toast('Account refreshed');}catch(ex){toast(e
 case 'open-admin':go('admin');break;
 case 'close-modal':closeModal();break;
 case 'back-admin':state.page='profile';render();break;
-case 'admin-tab':state.adminTab=target.dataset.tab;renderAdmin();break;
+case 'admin-toggle-nav':state.adminNavOpen=!state.adminNavOpen;renderAdmin();break;
+case 'admin-tab':state.adminTab=target.dataset.tab;state.adminNavOpen=false;renderAdmin();break;
 case 'admin-user':openUserModal(target.dataset.id);break;
 case 'admin-approve':if(confirm('Approve VIP and deduct plan price from the member wallet?'))await adminAction('approveVip',{requestId:target.dataset.id});break;
 case 'admin-reject':await adminAction('rejectVip',{requestId:target.dataset.id});break;
+case 'admin-add-method':methodModal('');break;
+case 'admin-edit-method':methodModal(target.dataset.id);break;
+case 'admin-delete-method':if(confirm('Delete this receiving method? Existing transaction history is preserved.'))await adminAction('deletePaymentMethod',{methodId:target.dataset.id});break;
 case 'admin-add-package':packageModal('');break;
 case 'admin-edit-package':packageModal(target.dataset.id);break;
 case 'admin-delete-package':if(confirm('Delete this package? Active members keep their current reward terms.'))await adminAction('deleteVipPackage',{packageId:target.dataset.id});break;
@@ -167,7 +171,9 @@ modal(deposit?'Manual deposit':'Manual withdrawal',
 '<button class="btn btn-primary btn-block" id="money-submit" style="margin-top:14px" '+(deposit&&!valid.length?'disabled':'')+'>Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');}
 document.addEventListener('change',function(e){if(e.target&&e.target.id==='money-method')showMethodDestination();});
 
-document.addEventListener('submit',async function(e){if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
+document.addEventListener('submit',async function(e){if(e.target.id==='staff-form'){e.preventDefault();if(!confirm('Update role for this Telegram user?'))return;await adminAction('setRole',{userId:document.getElementById('staff-id').value.trim(),role:document.getElementById('staff-role').value});return;}
+if(e.target.id==='method-form'){e.preventDefault();await adminAction('savePaymentMethod',{methodId:e.target.dataset.id,method:{name:document.getElementById('method-name').value.trim(),number:document.getElementById('method-number').value.trim(),enabled:document.getElementById('method-enabled').value==='yes'}});return;}
+if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
 async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();}catch(e){toast(e.message);state.page='profile';render();}}
 
 
@@ -291,13 +297,28 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
 }
 
 function openUserModal(id){var u=state.admin.users.find(function(x){return x.id===id;});if(!u)return;
-var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{};
-var tierOptions='<option value="free" '+(u.vipTier==='free'?'selected':'')+'>Free</option>'+
+ var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{};
+ var tierOptions='<option value="free" '+(u.vipTier==='free'?'selected':'')+'>Free</option>'+
  Object.keys(packages).map(function(key){return '<option value="'+esc(key)+'" '+(u.vipTier===key?'selected':'')+'>'+esc(packages[key].name)+'</option>';}).join('');
-if(u.vipTier!=='free'&&!packages[u.vipTier])tierOptions+='<option value="'+esc(u.vipTier)+'" selected>Legacy · '+esc(u.vipTier)+'</option>';
-modal('Manage member','<div class="user-row" style="margin-top:16px">'+avatar(u)+'<div class="user-main"><strong>'+esc(u.name)+'</strong><small>ID '+esc(u.id)+'</small></div></div><label class="form-label">VIP access</label><select class="field" id="user-tier">'+tierOptions+'</select><label class="form-label">Credit AFN (0 to skip)</label><input class="field" id="user-points" type="number" min="0" max="100000" step="1" value="0"><label class="form-label">Account status</label><select class="field" id="user-ban"><option value="false" '+(!u.banned?'selected':'')+'>Active</option><option value="true" '+(u.banned?'selected':'')+'>Banned</option></select><button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-user" data-id="'+esc(u.id)+'">Save changes</button>');}
+ if(u.vipTier!=='free'&&!packages[u.vipTier])tierOptions+='<option value="'+esc(u.vipTier)+'" selected>Legacy · '+esc(u.vipTier)+'</option>';
+ var staff=(state.admin.staffRoles||[]).find(function(s){return s.id===id;});
+ var isRoot=(state.admin.rootOwners||[]).includes(id);
+ var roleLabel=isRoot?'Root owner':staff?staff.role:'Member';
+ modal('Manage member','<div class="user-row" style="margin-top:16px">'+avatar(u)+'<div class="user-main"><strong>'+esc(u.name)+'</strong><small>ID '+esc(u.id)+' · '+esc(roleLabel)+'</small></div></div>'+
+ '<div class="admin-balance-overview"><small>Available balance</small><strong>'+currency(u.balance)+'</strong></div>'+
+ '<div class="inline-fields"><div><label class="form-label">Add balance (AFN)</label><input class="field" id="user-credit" type="number" min="0" max="100000" step="1" value="0"></div>'+
+ '<div><label class="form-label">Deduct balance (AFN)</label><input class="field" id="user-deduct" type="number" min="0" max="100000" step="1" value="0"></div></div>'+
+ '<div class="admin-callout">Only one balance adjustment at a time. Deductions cannot make the balance negative.</div>'+
+ '<label class="form-label">VIP membership</label><select class="field" id="user-tier">'+tierOptions+'</select>'+
+ '<label class="form-label">Account status</label><select class="field" id="user-ban"><option value="false" '+(!u.banned?'selected':'')+'>Active</option><option value="true" '+(u.banned?'selected':'')+'>Banned</option></select>'+
+ '<button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-user" data-id="'+esc(u.id)+'">Save changes</button>');}
 
-async function saveAdminUser(){var el=document.querySelector('[data-action="admin-save-user"]');if(!el)return;await adminAction('updateUser',{userId:el.dataset.id,tier:document.getElementById('user-tier').value,addPoints:Number(document.getElementById('user-points').value),banned:document.getElementById('user-ban').value==='true'});}
+async function saveAdminUser(){var el=document.querySelector('[data-action="admin-save-user"]');if(!el)return;
+ var credit=Number(document.getElementById('user-credit').value),deduction=Number(document.getElementById('user-deduct').value);
+ if(!Number.isSafeInteger(credit)||!Number.isSafeInteger(deduction)||credit<0||deduction<0)return toast('Enter valid whole AFN amounts');
+ if(credit&&deduction)return toast('Use either Add or Deduct, not both');
+ if(deduction&&!confirm('Confirm manual deduction of '+currency(deduction)+' from this member?'))return;
+ await adminAction('updateUser',{userId:el.dataset.id,tier:document.getElementById('user-tier').value,balanceDelta:credit-deduction,banned:document.getElementById('user-ban').value==='true'});}
 function getNum(id){return Number(document.getElementById(id).value);}
 async function saveAdminSettings(){await adminAction('saveSettings',{
  announcement:document.getElementById('admin-announcement').value,
@@ -313,6 +334,17 @@ async function saveAdminSettings(){await adminAction('saveSettings',{
  depositInstructions:document.getElementById('admin-deposit-inst').value,
  payoutInstructions:document.getElementById('admin-payout-inst').value
 });}
+
+function methodModal(key){var list=state.admin.settings.paymentMethods||[],m=key?list.find(function(v){return v.id===key;}):null;
+ if(key&&!m){toast('Payment method not found');return;}
+ modal(key?'Edit payment method':'Add payment method',
+ '<form id="method-form" data-id="'+esc(key||'')+'">'+
+ '<label class="form-label">Payment method name</label><input class="field" id="method-name" maxlength="45" minlength="3" value="'+esc(m&&m.name||'')+'" placeholder="e.g. Hawala · Roshan" required>'+
+ '<label class="form-label">Receiving number / account</label><input class="field" id="method-number" maxlength="40" value="'+esc(m&&m.number||'')+'" placeholder="Enter phone or bank account number" required>'+
+ '<label class="form-label">Status</label><select class="field" id="method-enabled"><option value="yes" '+(!m||m.enabled!==false?'selected':'')+'>Visible to customers</option><option value="no" '+(m&&m.enabled===false?'selected':'')+'>Hidden</option></select>'+
+ '<div class="alert">The user will see the selected receiving number with a Copy button. Verify transfers manually before approving deposits.</div>'+
+ '<button class="btn btn-primary btn-block" style="margin-top:17px">Save payment method</button></form>');}
+
 function packageModal(key){var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{},p=key?packages[key]:null;
 if(key&&!p)return toast('VIP package not found');
 modal(key?'Edit VIP package':'Create VIP package',
