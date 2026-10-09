@@ -170,41 +170,126 @@ document.addEventListener('change',function(e){if(e.target&&e.target.id==='money
 document.addEventListener('submit',async function(e){if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
 async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();}catch(e){toast(e.message);state.page='profile';render();}}
 
-function adminTabs(){return '<div class="admin-tabs">'+[['overview','Overview'],['users','Members'],['requests','VIP'],['packages','Packages'],['money','Payments'],['settings','Settings']].map(function(t){return '<button class="admin-tab '+(state.adminTab===t[0]?'active':'')+'" data-action="admin-tab" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';}
-function adminUserRows(users){return users.length?users.map(function(u){return '<div class="admin-row"><div style="min-width:0"><strong>'+esc(u.name||'Member')+'</strong> '+(u.banned?'<span class="badge red">BANNED</span>':'')+'<small>ID '+esc(u.id)+' · '+currency(u.balance)+' · '+esc(u.vipTier||'free')+'</small></div><button class="btn btn-ghost btn-small" data-action="admin-user" data-id="'+esc(u.id)+'">Manage</button></div>';}).join(''):empty('users','No members found','No matching members.');}
-function adminNumber(label,id,value,min,max){return '<div><label class="form-label">'+esc(label)+'</label><input class="field" id="'+id+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+n(value).replace(/,/g,'')+'" required></div>';}
-function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div class="body-sub">Loading admin...</div>';return;}
- var tab=state.adminTab,html='<header class="topbar"><div class="brand-wrap"><span class="brand-mark">A</span><div><div class="brand-name">AFGLION ADMIN</div><div class="brand-kicker">CONTROL CENTER</div></div></div><button class="round-button" data-action="back-admin" aria-label="Close admin">'+icon('logout')+'</button></header><div class="view">'+goldTitle('Control center.','Verified admin tools: VIP, referral rates, deposits and withdrawals.')+adminTabs();
- if(tab==='overview')html+='<div class="admin-quick"><div class="admin-card"><b>'+n(a.stats.members)+'</b><small>Members</small></div><div class="admin-card"><b>'+n(a.stats.vip)+'</b><small>Active VIP</small></div><div class="admin-card"><b>'+n(a.stats.pending)+'</b><small>Pending reviews</small></div><div class="admin-card"><b>'+n(a.stats.points)+'</b><small>AFN in user wallets</small></div></div>'+section('Newest members')+adminUserRows(a.users.slice(0,6));
- if(tab==='users')html+='<input id="admin-search" class="field" placeholder="Search name or Telegram ID" aria-label="Search members"><div id="admin-users">'+adminUserRows(a.users)+'</div>';
- if(tab==='requests')html+=a.requests.length?a.requests.map(function(req){return '<div class="admin-row"><div><strong>'+esc(req.name||req.userId)+'</strong> <span class="badge">'+esc(req.tier.toUpperCase())+'</span><small>'+currency(req.price)+' · '+fmtDate(req.createdAt)+'</small></div><div class="mini-actions"><button class="btn btn-primary btn-small" data-action="admin-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';}).join(''):empty('check','No VIP requests','You have no VIP purchases to review.');
- if(tab==='money')html+=(a.moneyRequests||[]).length?a.moneyRequests.map(function(req){return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'⬇ Deposit':'⬆ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div><p><b>'+esc(req.name)+'</b> · ID '+esc(req.userId)+'</p><p>Method: '+esc(req.method)+'</p><p>Reference / Details: '+esc(req.details)+'</p><small>'+fmtDate(req.createdAt)+'</small><div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';}).join(''):empty('check','No payment requests','Deposits and withdrawals awaiting review will appear here.');
- if(tab==='packages'){
-  var packages=a.settings.vipPackages||a.settings.plans||{};
-  html+='<button class="btn btn-primary btn-block" data-action="admin-add-package">'+icon('crown')+' Create new VIP package</button>'+
-  '<p class="body-sub" style="margin-top:14px">Create unlimited custom options (up to 20 active records); each purchase keeps its approved plan terms.</p>'+
-  Object.keys(packages).map(function(key){var p=packages[key];return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(p.name)+'</b><small>'+currency(p.price)+' · '+currency(p.dailyReward)+'/day · '+n(p.days)+' days</small></div><span class="badge">'+(p.enabled===false?'HIDDEN':'ACTIVE')+'</span></div><div class="package-manage-actions"><button class="btn btn-outline btn-small" data-action="admin-edit-package" data-id="'+esc(key)+'">'+icon('edit')+' Edit</button><button class="btn btn-ghost btn-small" data-action="admin-delete-package" data-id="'+esc(key)+'">Delete</button></div></div>';}).join('');
- }
- if(tab==='settings'){var st=a.settings;
- html+='<label class="form-label">Announcement</label><textarea id="admin-announcement" class="field" maxlength="350">'+esc(st.announcement||'')+'</textarea>'+
- section('Join requirement')+'<label class="check-row"><input type="checkbox" id="admin-force-enabled" '+(st.forceJoinEnabled?'checked':'')+'> Require channel membership before app access</label>'+
- '<label class="form-label">Required Telegram channel (public URL)</label><input class="field" id="admin-force-channel" value="'+esc(st.forceJoinChannel||'https://t.me/geminipromtshub')+'">'+
- '<p class="muted-note">Important: @Afglionbot must be an administrator in the required channel to verify joined members.</p>'+
- section('Home channel button')+'<label class="form-label">Telegram channel link displayed on Home</label><input class="field" id="admin-home-channel" value="'+esc(st.homeChannelUrl||'https://t.me/geminipromtshub')+'">'+
- section('Free daily check-in')+'<label class="check-row"><input type="checkbox" id="admin-daily-enabled" '+(st.dailyEnabled?'checked':'')+'> Show free daily rewards on Home</label>'+
- '<div class="inline-fields">'+adminNumber('Free daily reward (AFN)','admin-daily',st.dailyBonus,0,1000)+adminNumber('VIP referral commission %','admin-referral',st.referralPercent,0,50)+'</div>'+
- section('Manual deposit instructions')+'<label class="form-label">Receiving number</label><input class="field" id="admin-deposit-number" maxlength="40" placeholder="Enter your payment number" value="'+esc(st.depositNumber||'')+'">'+
- '<label class="form-label">Screenshot recipient (Telegram username)</label><input class="field" id="admin-deposit-contact" value="'+esc(st.depositContact||'Mk_Malakzai')+'">'+
- '<label class="form-label">Deposit instructions</label><textarea class="field" id="admin-deposit-inst" maxlength="500">'+esc(st.depositInstructions||'')+'</textarea>'+
- section('Withdrawal instructions')+'<label class="form-label">Payout instructions</label><textarea class="field" id="admin-payout-inst" maxlength="500">'+esc(st.payoutInstructions||'')+'</textarea>'+
- '<div class="inline-fields">'+adminNumber('Minimum deposit (AFN)','admin-min-deposit',st.minDeposit,1,100000)+adminNumber('Minimum withdrawal','admin-min-withdraw',st.minWithdraw,1,100000)+'</div>'+
- '<label class="form-label">Bot username</label><input class="field" id="admin-bot" value="'+esc(st.botUsername||'Afglionbot')+'"><button class="btn btn-primary btn-block" style="margin-top:20px" data-action="admin-save-settings">Save all settings</button>';
- }
 
- root.className='app-shell admin-shell';root.innerHTML=html+footer()+'</div>';
- var search=document.getElementById('admin-search');if(search)search.addEventListener('input',function(){var q=search.value.toLowerCase().trim();document.getElementById('admin-users').innerHTML=adminUserRows(a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}));});
+var adminNavigation=[
+ {group:'Main',items:[['overview','Dashboard','home'],['users','Members','users']]},
+ {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings']]},
+ {group:'Subscriptions',items:[['requests','VIP approvals','crown'],['packages','VIP packages','star']]},
+ {group:'Configuration',items:[['settings','Settings','settings'],['staff','Staff & owners','shield']]}
+];
+function adminLabel(key){
+ for(var i=0;i<adminNavigation.length;i++){var item=adminNavigation[i].items.find(function(x){return x[0]===key});if(item)return item[1];}
+ return 'Dashboard';
+}
+function adminTabs(){
+ var onlyOwner=state.admin&&state.admin.callerRole==='owner';
+ var content=adminNavigation.map(function(section){
+ var buttons=section.items.filter(function(i){return i[0]!=='staff'||onlyOwner;}).map(function(i){
+ return '<button class="admin-side-link '+(state.adminTab===i[0]?'active':'')+'" data-action="admin-tab" data-tab="'+i[0]+'">'+icon(i[2])+'<span>'+esc(i[1])+'</span>'+(state.adminTab===i[0]?'<span class="admin-link-current"></span>':'')+'</button>';}).join('');
+ return '<div class="admin-nav-group"><div class="admin-nav-group-title">'+esc(section.group)+'</div>'+buttons+'</div>';
+ }).join('');
+ return (state.adminNavOpen?'<div class="admin-drawer-shade" data-action="admin-toggle-nav"></div><aside class="admin-drawer" aria-label="Administrator menu"><div class="admin-drawer-top"><div><span class="eyebrow">AFGLION</span><h3>Control Center</h3></div><button class="round-button" data-action="admin-toggle-nav" aria-label="Close menu">×</button></div>'+content+'<div class="admin-drawer-foot">Role: '+esc((state.admin.callerRole||'admin').toUpperCase())+'</div></aside>':'');
+}
+function adminUserRows(users){
+ var plans=state.admin.settings.vipPackages||state.admin.settings.plans||{};
+ return users.length?users.map(function(u){
+ var title=u.vipPlanSnapshot&&u.vipPlanSnapshot.name||plans[u.vipTier]&&plans[u.vipTier].name||(/vip_/.test(u.vipTier||'')?'VIP':u.vipTier||'free');
+ var staff=state.admin.staffRoles.find(function(x){return x.id===u.id;});
+ var isRoot=(state.admin.rootOwners||[]).includes(u.id);
+ return '<div class="admin-row"><div class="admin-row-person"><strong>'+esc(u.name||'Member')+'</strong> '+(u.banned?'<span class="badge red">BANNED</span>':'')+(staff||isRoot?'<span class="badge">'+esc(isRoot?'OWNER':staff.role.toUpperCase())+'</span>':'')+'<small>ID '+esc(u.id)+' · '+currency(u.balance)+' · '+esc(title)+'</small></div><button class="btn btn-ghost btn-small" data-action="admin-user" data-id="'+esc(u.id)+'">Manage</button></div>';
+ }).join(''):empty('users','No members found','No matching members.');
+}
+function adminNumber(label,id,value,min,max){return '<div><label class="form-label">'+esc(label)+'</label><input class="field" id="'+id+'" type="number" min="'+min+'" max="'+max+'" step="1" value="'+n(value).replace(/,/g,'')+'"></div>';}
+function adminShortcut(tab,title,description,ic){
+ return '<button class="admin-shortcut" data-action="admin-tab" data-tab="'+tab+'"><span class="action-icon">'+icon(ic)+'</span><div><strong>'+esc(title)+'</strong><small>'+esc(description)+'</small></div>'+icon('arrow')+'</button>';
+}
+function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div class="body-sub">Loading admin...</div>';return;}setTheme();
+ var tab=state.adminTab;
+ var html='<header class="topbar admin-main-header"><button class="admin-menu-trigger" data-action="admin-toggle-nav" aria-label="Open admin menu">'+icon('menu')+'</button><div class="admin-heading"><div class="brand-name">AFGLION ADMIN</div><div class="brand-kicker">CONTROL CENTER</div></div><button class="round-button" data-action="back-admin" aria-label="Exit admin">'+icon('logout')+'</button></header>'+
+ '<div class="view admin-view"><div class="admin-context"><div><span class="eyebrow">'+esc((a.callerRole||'admin').toUpperCase())+' CONTROL</span><h1>'+esc(adminLabel(tab))+'</h1></div><span class="admin-context-icon">'+icon(tab==='overview'?'shield':'settings')+'</span></div>';
+ if(tab==='overview'){
+ html+='<div class="admin-quick"><div class="admin-card"><b>'+n(a.stats.members)+'</b><small>Total members</small></div><div class="admin-card"><b>'+n(a.stats.vip)+'</b><small>Active VIP</small></div><div class="admin-card"><b>'+n(a.stats.pending)+'</b><small>Waiting requests</small></div><div class="admin-card"><b>'+n(a.stats.points)+'</b><small>AFN circulation (sample)</small></div></div>'+
+ section('Quick actions')+'<div class="admin-shortcuts">'+
+ adminShortcut('money','Payments','Approve deposits & withdrawals','wallet')+
+ adminShortcut('users','Member accounts','Balances and status','users')+
+ adminShortcut('packages','VIP packages','Plans and pricing','crown')+
+ adminShortcut('settings','Bot settings','Rules and channels','settings')+'</div>'+
+ section('New members')+adminUserRows(a.users.slice(0,5));
+ }
+ if(tab==='users'){
+ html+='<div class="admin-callout">All balances are stored per Telegram account. Use Manage to add or deduct funds and control VIP or account status.</div>'+
+ '<input id="admin-search" class="field" placeholder="Search name, username or ID" aria-label="Search members" autocomplete="off">'+
+ '<div id="admin-users">'+adminUserRows(a.users)+'</div>';
+ }
+ if(tab==='requests'){
+ html+=a.requests.length?a.requests.map(function(req){
+ var p=req.planSnapshot||a.settings.vipPackages&&a.settings.vipPackages[req.tier]||{};
+ return '<div class="payment-review"><div class="review-header"><b>'+esc(req.name||req.userId)+'</b><span class="badge">VIP</span></div><p>'+esc(p.name||req.tier)+' · '+currency(req.price)+'</p><small>ID '+esc(req.userId)+' · '+fmtDate(req.createdAt)+'</small><div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
+ }).join(''):empty('check','All caught up','No VIP approvals are waiting.');
+ }
+ if(tab==='money'){
+ html+=(a.moneyRequests||[]).length?a.moneyRequests.map(function(req){
+ return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'↓ Deposit':'↑ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div>'+
+ '<p><b>'+esc(req.name)+'</b> · ID '+esc(req.userId)+'</p><p>Method: '+esc(req.method)+'</p>'+
+ (req.receivingNumber?'<p>Receiving number: '+esc(req.receivingNumber)+'</p>':'')+
+ '<p>Reference/details: '+esc(req.details)+'</p><small>'+fmtDate(req.createdAt)+'</small>'+
+ '<div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
+ }).join(''):empty('check','No pending payments','New deposit and withdrawal requests will show here.');
+ }
+ if(tab==='methods'){
+ var methods=a.settings.paymentMethods||[];
+ html+='<div class="admin-callout">Add receiving methods such as Hawala, bank or mobile wallet. The chosen number appears to customers on Deposit with a Copy button.</div>'+
+ '<button class="btn btn-primary btn-block" data-action="admin-add-method">'+icon('wallet')+' Add payment method</button>'+
+ (methods.length?methods.map(function(m){
+ return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(m.name)+'</b><small>'+esc(m.number||'No receiving number')+'</small></div><span class="badge '+(m.enabled===false?'red':'green')+'">'+(m.enabled===false?'HIDDEN':'ACTIVE')+'</span></div>'+
+ '<div class="package-manage-actions"><button class="btn btn-outline btn-small" data-action="admin-edit-method" data-id="'+esc(m.id)+'">'+icon('edit')+' Edit</button><button class="btn btn-ghost btn-small" data-action="admin-delete-method" data-id="'+esc(m.id)+'">Delete</button></div></div>';
+ }).join(''):empty('wallet','No methods available','Add your first receiving method above.'));
+ }
+ if(tab==='packages'){
+ var packages=a.settings.vipPackages||a.settings.plans||{};
+ html+='<div class="admin-callout">Add or edit VIP subscriptions. Plans already approved keep their original schedule. Maximum 20 packages.</div><button class="btn btn-primary btn-block" data-action="admin-add-package">'+icon('crown')+' Create VIP package</button>'+
+ Object.keys(packages).map(function(key){var p=packages[key];return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(p.name)+'</b><small>'+currency(p.price)+' · '+currency(p.dailyReward)+'/day · '+n(p.days)+' days</small></div><span class="badge '+(p.enabled===false?'red':'green')+'">'+(p.enabled===false?'HIDDEN':'ACTIVE')+'</span></div><div class="package-manage-actions"><button class="btn btn-outline btn-small" data-action="admin-edit-package" data-id="'+esc(key)+'">'+icon('edit')+' Edit</button><button class="btn btn-ghost btn-small" data-action="admin-delete-package" data-id="'+esc(key)+'">Delete</button></div></div>';}).join('');
+ }
+ if(tab==='staff'){
+ if(a.callerRole!=='owner')html+=empty('shield','Owner access required','Only project owners can manage staff roles.');
+ else{
+ html+='<div class="admin-callout">Owners can add or remove admins and appoint additional owners. Environment-defined owners cannot be demoted. Appointments require the user to open the Mini App once.</div>'+
+ '<form id="staff-form"><label class="form-label">Member numeric Telegram ID</label><input class="field" id="staff-id" inputmode="numeric" pattern="[0-9]{3,20}" placeholder="e.g. 123456789" required>'+
+ '<label class="form-label">Access role</label><select class="field" id="staff-role"><option value="admin">Administrator</option><option value="owner">Owner</option><option value="user">Normal user (revoke access)</option></select>'+
+ '<button class="btn btn-primary btn-block" style="margin-top:16px">Save staff role</button></form>'+
+ section('Assigned staff')+
+ (a.rootOwners||[]).map(function(id){return '<div class="admin-row"><b>ID '+esc(id)+'</b><span class="badge">ROOT OWNER</span></div>';}).join('')+
+ (a.staffRoles||[]).map(function(staff){return '<div class="admin-row"><b>ID '+esc(staff.id)+'</b><span class="badge">'+esc(staff.role.toUpperCase())+'</span></div>';}).join('');
+ }
+ }
+ if(tab==='settings'){
+ var st=a.settings;
+ html+='<div class="admin-callout">Settings are grouped below. Expand only the section you need, then tap Save all settings once.</div><div class="admin-setting-groups">'+
+ '<details class="admin-section" open><summary>'+icon('users')+' Channels & access <span>⌄</span></summary><div class="admin-section-body">'+
+ '<label class="check-row"><input type="checkbox" id="admin-force-enabled" '+(st.forceJoinEnabled?'checked':'')+'> Require joining a channel</label>'+
+ '<label class="form-label">Force-join channel</label><input class="field" id="admin-force-channel" value="'+esc(st.forceJoinChannel||'https://t.me/geminipromtshub')+'">'+
+ '<p class="muted-note">Add the Telegram bot as administrator of the channel to verify membership.</p>'+
+ '<label class="form-label">Home channel link</label><input class="field" id="admin-home-channel" value="'+esc(st.homeChannelUrl||'https://t.me/geminipromtshub')+'"></div></details>'+
+ '<details class="admin-section"><summary>'+icon('gift')+' Earnings & commission <span>⌄</span></summary><div class="admin-section-body">'+
+ '<label class="check-row"><input type="checkbox" id="admin-daily-enabled" '+(st.dailyEnabled?'checked':'')+'> Enable free daily check-in</label>'+
+ '<div class="inline-fields">'+adminNumber('Daily reward (AFN)','admin-daily',st.dailyBonus,0,1000)+adminNumber('VIP referral %','admin-referral',st.referralPercent,0,50)+'</div></div></details>'+
+ '<details class="admin-section"><summary>'+icon('wallet')+' Deposit & withdrawals <span>⌄</span></summary><div class="admin-section-body">'+
+ '<div class="inline-fields">'+adminNumber('Min deposit','admin-min-deposit',st.minDeposit,1,100000)+adminNumber('Min withdraw','admin-min-withdraw',st.minWithdraw,1,100000)+'</div>'+
+ '<label class="form-label">Screenshot receiver (Telegram username)</label><input class="field" id="admin-deposit-contact" value="'+esc(st.depositContact||'Mk_Malakzai')+'">'+
+ '<label class="form-label">Deposit instructions</label><textarea id="admin-deposit-inst" class="field" maxlength="500">'+esc(st.depositInstructions||'')+'</textarea>'+
+ '<label class="form-label">Withdrawal instructions</label><textarea id="admin-payout-inst" class="field" maxlength="500">'+esc(st.payoutInstructions||'')+'</textarea>'+
+ '<label class="form-label">Legacy default receiving number (optional)</label><input class="field" id="admin-deposit-number" value="'+esc(st.depositNumber||'')+'"><p class="muted-note">For multiple methods, use Payment methods in the menu.</p></div></details>'+
+ '<details class="admin-section"><summary>'+icon('settings')+' Branding & announcement <span>⌄</span></summary><div class="admin-section-body">'+
+ '<label class="form-label">Announcement</label><textarea id="admin-announcement" class="field" maxlength="350">'+esc(st.announcement||'')+'</textarea>'+
+ '<label class="form-label">Telegram bot username</label><input class="field" id="admin-bot" value="'+esc(st.botUsername||'Afglionbot')+'"></div></details>'+
+ '</div><div class="admin-save-dock"><button class="btn btn-primary btn-block" data-action="admin-save-settings">'+icon('check')+' Save all settings</button></div>';
+ }
+ root.className='app-shell admin-shell';root.innerHTML=html+footer()+'</div>'+adminTabs();
+ var search=document.getElementById('admin-search');
+ if(search)search.addEventListener('input',function(){var q=search.value.toLowerCase().trim();document.getElementById('admin-users').innerHTML=adminUserRows(a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}));});
  window.scrollTo({top:0,behavior:'smooth'});
 }
+
 function openUserModal(id){var u=state.admin.users.find(function(x){return x.id===id;});if(!u)return;
 var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{};
 var tierOptions='<option value="free" '+(u.vipTier==='free'?'selected':'')+'>Free</option>'+
