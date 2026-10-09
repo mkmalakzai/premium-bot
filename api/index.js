@@ -520,7 +520,7 @@ async function route(req){
      try{
       const response=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/sendMessage',{
        method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({chat_id:userId,text:'🦁 <b>AFGLION | MEMBERS CLUB</b>\n━━━━━━━━━━━━━━━━━━━━\n\n'+lease.message+'\n\n━━━━━━━━━━━━━━━━━━━━\n✦ <i>Official AFGLION announcement</i>',parse_mode:'HTML',disable_web_page_preview:true}),
+       body:JSON.stringify({chat_id:userId,text:'🦁 <b>AFGLION | MEMBERS CLUB</b>\n━━━━━━━━━━━━━━━━━━━━\n\n'+lease.message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'\n\n━━━━━━━━━━━━━━━━━━━━\n✦ <i>Official AFGLION announcement</i>',parse_mode:'HTML',disable_web_page_preview:true}),
        signal:AbortSignal.timeout(4500)
       });
       const answer=await response.json();
