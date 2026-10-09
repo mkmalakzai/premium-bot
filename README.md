@@ -2,6 +2,18 @@
 
 A mobile-first HTML/CSS/JavaScript Telegram Mini App deployed on Vercel with a Firebase Cloud Firestore backend. The visual public Firebase config references the existing **afglion-47b07** project, but **all accounts and AFN balances are accessed through authenticated Vercel functions using Firebase Admin SDK**. The public Firebase web config alone does **not** activate the backend.
 
+## October 9, 2026 — UI & admin improvements
+
+- **Languages:** Vanilla HTML, CSS and JavaScript for the Telegram Mini App; Node.js CommonJS Vercel API; Cloud Firestore with Firebase Admin SDK.
+- **Main tabs:** Home → VIP → Referral → Profile. The account/profile theme switch can toggle a designed dark or light palette. Theme is remembered per browser/device.
+- **Mobile polish:** Avatar has a stable circular crop. VIP IDs such as `vip_randomid` no longer stretch the wallet or stats cards; cards use the friendly VIP package name, and long text truncates safely.
+- **Redesigned Admin:** Three-line hamburger navigation opens an accessible left drawer with Dashboard, Members, Transactions, Payment methods, VIP approvals, VIP packages, Settings, and Staff & owners (owner-only). Settings are grouped into expandable sections.
+- **Payment methods:** Admin → Payment methods can add, edit, show/hide and delete up to 12 methods. Each has a name, payment recipient number and enabled status. The deposit form uses the chosen method's number, a Copy button, and sends users to a configurable Telegram contact for screenshots. Server verifies the payment method against live settings. Manual withdrawals also select a supported method.
+- **Permissions:** Numeric Telegram IDs in `ADMIN_TELEGRAM_IDS` are permanent root owners. Owners can promote an existing Telegram member to `admin` or `owner`, or demote them. Regular admins can manage ordinary users but cannot modify staff-role privileges or ban or adjust other administrators. New owner appointments are protected by a server-side owner check; no UI query parameter can grant access.
+- **Balances:** Admin → Members → Manage supports adding OR deducting an AFN amount. The server validates signed whole amounts, rejects overdrafts and writes an audit event and member activity.
+- **Finance:** Approved deposits, withdrawals, VIP purchases and balances remain protected by Firestore transactions. Do not use as a regulated bank or promise scheduled VIP returns as guaranteed profits.
+- **Note on environment:** Telegram bot token and service-account JSON remain sensitive Production-only Vercel environment variables and are never included in the client bundle.
+
 ## October 2026 update — channel gate, flexible VIP, deposit instructions
 
 - **Force Join:** default public channel `https://t.me/geminipromtshub`, changeable from Admin → Settings. The bot **@Afglionbot must be added as administrator to this Telegram channel**, otherwise the official `getChatMember` API is not guaranteed to verify membership. The backend verifies membership before returning a Telegram API session and again for every protected request, and fails closed if it cannot confirm membership. Administrator IDs are exempt so channel misconfiguration cannot lock out the owner. Test force-join with a separate non-admin Telegram account.
