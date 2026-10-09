@@ -356,7 +356,7 @@ async function route(req){
   }
   if(type==='updateUser'){
    const targetId=String(body.userId||'');
-   if(!numericId(targetId)||!(body.tier==='free'||/^[a-z0-9_-]{2,32}$/.test(body.tier))||!whole(body.addPoints,0,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
+   if(!numericId(targetId)||!(body.tier==='free'||/^[a-z0-9_-]{2,32}$/.test(body.tier))||!whole(body.balanceDelta===undefined?body.addPoints:body.balanceDelta,-100000,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
    const targetRole=await roleOf(targetId,store);
    if(roleRank(targetRole)>0&&role!=='owner')fail(403,'Owner approval required for staff accounts');
    if(roleRank(targetRole)>0&&body.banned)fail(400,'Staff accounts cannot be banned');
@@ -365,14 +365,17 @@ async function route(req){
     const u=await tx.get(userRef);
     if(!u.exists)fail(404,'Member not found');
     const update={banned:body.banned};
+    const delta=body.balanceDelta===undefined?body.addPoints:body.balanceDelta;
+    if(delta<0&&(u.data().balance||0)<-delta)fail(409,'Cannot deduct more than available balance');
     if(u.data().vipTier!==body.tier||(body.tier!=='free'&&(u.data().vipUntil||0)<now)){
      const p=body.tier==='free'?null:planFor(settings(await tx.get(settingRef)),body.tier);
      update.vipTier=body.tier;update.vipActivatedAt=p?now:0;
      update.vipUntil=p?now+p.days*DAY:0;update.vipPlanSnapshot=p||null;update.vipLastClaimSlot=0;update.vipDaysClaimed=0;
     }
-    if(body.addPoints>0){
-     update.balance=admin.firestore.FieldValue.increment(body.addPoints);
-     tx.set(userRef.collection('activity').doc(),{label:'Admin credit',amount:body.addPoints,at:now});
+    if(delta!==0){
+     update.balance=admin.firestore.FieldValue.increment(delta);
+     tx.set(userRef.collection('activity').doc(),{label:delta>0?'Admin credit':'Admin deduction',amount:delta,at:now});
+     tx.set(store.collection(C.audits).doc(),{actor:id,kind:delta>0?'credit':'deduction',target:targetId,amount:delta,at:now});
     }
     tx.update(userRef,update);
    });return {ok:true};
