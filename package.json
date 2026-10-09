@@ -1,10 +1,10 @@
 {
-  "name": "velora-telegram-mini-app",
-  "version": "1.0.0",
+  "name": "afglion-telegram-mini-app",
+  "version": "2.0.0",
   "private": true,
-  "description": "Premium vanilla HTML/CSS/JS Telegram Mini App with secure Firebase Firestore and admin",
+  "description": "Premium Telegram Mini App: AFN wallet, manually approved payments, VIP claims and referral commissions",
   "scripts": {
-    "check": "node --check app.js && node --check api/index.js"
+    "check": "node --check app.js && node --check api/index.js && node --check firebase-config.js"
   },
   "engines": {
     "node": ">=20"
