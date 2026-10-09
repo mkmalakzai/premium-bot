@@ -112,7 +112,7 @@ switch(action){
 
 case 'open-link':var targetUrl=target.dataset.url;if(/^https:\/\/t\.me\/[A-Za-z0-9_]{5,32}\/?$/.test(targetUrl||'')){if(tg&&tg.openTelegramLink)tg.openTelegramLink(targetUrl);else window.open(targetUrl,'_blank','noopener,noreferrer');}break;
 case 'check-join':try{await telegramLogin();if(state.gate)toast('Join the channel, then check again');else toast('Membership verified!');}catch(e){toast(e.message);}break;
-case 'copy-deposit':if(data().settings.depositNumber)await copyValue(data().settings.depositNumber);break;
+case 'copy-deposit':var m=selectedMethod();if(m&&m.number)await copyValue(m.number);break;
 case 'theme-toggle':toggleTheme();break;
 case 'deposit':paymentModal('deposit');break;
 case 'withdraw':paymentModal('withdraw');break;
@@ -144,17 +144,30 @@ case 'admin-save-settings':saveAdminSettings();break;
 case 'admin-save-user':saveAdminUser();break;
 }});
 
-function paymentModal(type){var st=data().settings,deposit=type==='deposit',number=st.depositNumber||'',contact=st.depositContact||'Mk_Malakzai';
-modal(deposit?'Manual deposit':'Manual withdrawal',
-'<p class="body-sub">'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</p>'+
-(deposit?'<div class="deposit-destination"><small>Send payment to this number</small><strong>'+esc(number||'Payment number will be published by admin')+'</strong><button class="btn btn-outline btn-small" data-action="copy-deposit" '+(!number?'disabled':'')+'>'+icon('copy')+' Copy number</button></div><div class="deposit-steps"><b>Payment proof required</b><p>After sending your payment, send its screenshot to the Telegram administrator.</p><button class="btn btn-primary btn-block" data-action="open-link" data-url="https://t.me/'+esc(contact)+'">'+icon('external')+' Send screenshot to @'+esc(contact)+'</button></div>':'')+
-'<form id="money-form" data-type="'+type+'"><label class="form-label">Amount in AFN (minimum '+n(deposit?st.minDeposit:st.minWithdraw)+')</label><input class="field" id="money-amount" type="number" min="'+(deposit?st.minDeposit:st.minWithdraw)+'" max="1000000" step="1" placeholder="Amount" required>'+
-'<label class="form-label">Payment method</label><select class="field" id="money-method" required><option value="Hawala">Hawala</option><option value="Bank transfer">Bank transfer</option><option value="Cash agent">Cash agent</option><option value="Mobile wallet">Mobile wallet</option><option value="Other">Other</option></select>'+
-'<label class="form-label">'+(deposit?'Payment reference / sender details':'Recipient number / payout details')+'</label><textarea class="field" id="money-details" minlength="5" maxlength="300" placeholder="'+(deposit?'Enter your transfer reference and sender name':'Where should your withdrawal be sent?')+'" required></textarea>'+
-'<div class="alert">'+(deposit?'Send the screenshot to @'+esc(contact)+' and submit this request. Balance updates after admin review.':'Funds are reserved during manual review.')+'</div>'+
-'<button class="btn btn-primary btn-block" style="margin-top:14px">Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');}
 
-document.addEventListener('submit',async function(e){if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var method=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,method:method,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
+function availableMethods(){return (data().settings.paymentMethods||[{id:'manual',name:'Manual Transfer',number:data().settings.depositNumber||'',enabled:true}]).filter(function(m){return m.enabled!==false;});}
+function selectedMethod(){var el=document.getElementById('money-method');return availableMethods().find(function(m){return m.id===(el&&el.value);})||null;}
+function showMethodDestination(){var m=selectedMethod(),target=document.getElementById('payment-dest-number'),copy=document.getElementById('payment-copy'),submit=document.getElementById('money-submit');
+ if(!target)return;
+ target.textContent=m&&m.number?m.number:'This payment method has no receiving number yet';
+ if(copy)copy.disabled=!(m&&m.number);
+ if(submit)submit.disabled=!(m&&m.number);
+}
+function paymentModal(type){var st=data().settings,deposit=type==='deposit',methods=availableMethods(),contact=st.depositContact||'Mk_Malakzai',valid=methods.filter(function(m){return !deposit||m.number;});
+modal(deposit?'Manual deposit':'Manual withdrawal',
+'<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
+'<form id="money-form" data-type="'+type+'">'+
+'<label class="form-label">Payment method</label><select class="field" id="money-method" required>'+
+(methods.length?methods.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+(deposit&&!m.number?' (Not configured)':'')+'</option>';}).join(''):'<option value="">No methods configured</option>')+'</select>'+
+(deposit?'<div class="deposit-destination"><small>Send your AFN payment to this number</small><strong id="payment-dest-number">'+esc(methods[0]&&methods[0].number||'Please select a configured payment method')+'</strong><button type="button" class="btn btn-outline btn-small" id="payment-copy" data-action="copy-deposit" '+(!(methods[0]&&methods[0].number)?'disabled':'')+'>'+icon('copy')+' Copy number</button></div>'+
+'<div class="deposit-steps"><b>Send payment screenshot</b><p>After your transfer, send the receipt or screenshot to the administrator and then submit the request below.</p><button type="button" class="btn btn-primary btn-block" data-action="open-link" data-url="https://t.me/'+esc(contact)+'">'+icon('external')+' Message @'+esc(contact)+'</button></div>':'')+
+'<label class="form-label">Amount in AFN (minimum '+n(deposit?st.minDeposit:st.minWithdraw)+')</label><input class="field" id="money-amount" type="number" min="'+(deposit?st.minDeposit:st.minWithdraw)+'" max="1000000" step="1" placeholder="Amount" required>'+
+'<label class="form-label">'+(deposit?'Transaction reference / sender details':'Payout phone, account or recipient details')+'</label><textarea class="field" id="money-details" minlength="5" maxlength="300" placeholder="'+(deposit?'Receipt number and sender name':'Your recipient account details')+'" required></textarea>'+
+'<div class="alert">'+(deposit?'The administrator checks your screenshot and transfer before your wallet receives funds.':'Withdrawal funds are held until admin approval or rejection.')+'</div>'+
+'<button class="btn btn-primary btn-block" id="money-submit" style="margin-top:14px" '+(deposit&&!valid.length?'disabled':'')+'>Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');}
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='money-method')showMethodDestination();});
+
+document.addEventListener('submit',async function(e){if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var details=document.getElementById('money-details').value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,methodId:methodId,details:details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
 async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();}catch(e){toast(e.message);state.page='profile';render();}}
 
 function adminTabs(){return '<div class="admin-tabs">'+[['overview','Overview'],['users','Members'],['requests','VIP'],['packages','Packages'],['money','Payments'],['settings','Settings']].map(function(t){return '<button class="admin-tab '+(state.adminTab===t[0]?'active':'')+'" data-action="admin-tab" data-tab="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';}
