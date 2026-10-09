@@ -4,7 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
   <meta name="theme-color" content="#090c12">
-  <meta name="description" content="AFGLION Telegram Mini App for manual AFN wallet transactions, VIP rewards and referral commissions.">
+  <meta name="description" content="AFGLION Members Club — premium rewards, VIP memberships, trusted community.">
+  <meta name="theme-color" content="#090c12" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/svg+xml" href="/afglion-logo.svg">
+  <link rel="apple-touch-icon" href="/afglion-logo.svg">
+  <link rel="preload" href="/afglion-logo.svg" as="image" type="image/svg+xml">
+  <meta property="og:title" content="AFGLION — Members Club">
+  <meta property="og:description" content="Premium members club and Telegram Mini App.">
+  <meta property="og:image" content="https://velora-members-club.vercel.app/afglion-brand.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -16,8 +23,29 @@
 </head>
 <body>
   <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <div id="afg-loader" class="afg-loader" role="status" aria-live="polite" aria-label="Starting AFGLION">
+    <div class="afg-loader-light afg-loader-light-a"></div><div class="afg-loader-light afg-loader-light-b"></div>
+    <div class="afg-loader-content">
+      <div class="afg-loader-overline"><span class="afg-loader-spark"></span> YOUR PREMIUM EXPERIENCE <span class="afg-loader-spark"></span></div>
+      <div class="afg-logo-theater">
+        <div class="afg-orbit afg-orbit-outer"></div>
+        <div class="afg-orbit afg-orbit-inner"></div>
+        <div class="afg-orbit-point"></div>
+        <div class="afg-logo-glow"></div>
+        <img class="afg-loader-logo" src="/afglion-logo.svg" alt="AFGLION crowned lion logo" width="154" height="154">
+      </div>
+      <div class="afg-loader-wordmark">AFGLION</div>
+      <div class="afg-loader-subtitle"><span></span> MEMBERS CLUB <span></span></div>
+      <div class="afg-loader-copy">EXCELLENCE IN EVERY EXPERIENCE</div>
+      <div class="afg-loader-progress">
+        <div class="afg-loader-progress-label"><span id="afg-loading-status">Preparing your experience</span><span id="afg-loading-percent">8%</span></div>
+        <div class="afg-loader-track"><div id="afg-loading-fill" class="afg-loader-fill" style="width:8%"></div></div>
+      </div>
+    </div>
+    <div class="afg-loader-footer"><span class="afg-loader-footer-icon">✦</span> SECURE • PERSONAL • AFGLION</div>
+  </div>
   <main id="app" class="app-shell">
-    <div class="startup"><div class="startup-emblem">A</div><span>AFGLION</span><p>PREMIUM MEMBERS CLUB</p></div>
+    <div class="startup"><img src="/afglion-logo.svg" width="68" height="68" alt="AFGLION"><span>AFGLION</span><p>PREMIUM MEMBERS CLUB</p></div>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
