@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="logoTitle logoDesc">
+<title id="logoTitle">AFGLION golden lion crown emblem</title>
+<desc id="logoDesc">Premium golden lion head with royal crown inside a rounded black crest, AFGLION brand symbol</desc>
+<defs>
+ <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#fff1be"/><stop offset=".24" stop-color="#efd08c"/><stop offset=".52" stop-color="#bc8136"/><stop offset=".77" stop-color="#ffe4a0"/><stop offset="1" stop-color="#9f6327"/></linearGradient>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1f1d1b"/><stop offset=".5" stop-color="#080c12"/><stop offset="1" stop-color="#171616"/></linearGradient>
+ <radialGradient id="light"><stop stop-color="#ab722d" stop-opacity=".23"/><stop offset="1" stop-color="#ab722d" stop-opacity="0"/></radialGradient>
+</defs>
+<rect x="7" y="7" width="242" height="242" rx="54" fill="url(#bg)"/>
+<rect x="9.7" y="9.7" width="236.6" height="236.6" rx="51.5" fill="none" stroke="url(#gold)" stroke-width="2.9"/>
+<circle cx="128" cy="133" r="100" fill="url(#light)"/>
+<circle cx="128" cy="133" r="96" stroke="#bf8a49" stroke-opacity=".43" stroke-width="1.4" fill="none"/>
+<circle cx="128" cy="133" r="90" stroke="#f0d8a1" stroke-opacity=".16" stroke-width="1" fill="none"/>
+<!-- The AFGLION crown, with an A-shaped sovereign point -->
+<path d="M75 82 65 50 95 65 128 34 161 65 191 50 181 82Z" fill="url(#gold)" fill-opacity=".96"/>
+<path d="M77 83H179L174 93H82Z" fill="#b17b3b" stroke="#f6d899" stroke-width="1.2"/>
+<path d="M95 65 128 34 161 65M76 82H180" fill="none" stroke="#ffebb0" stroke-width="2" opacity=".7"/>
+<path d="M123 77 128 62 133 77M125 72h6" fill="none" stroke="#24170e" stroke-width="3" stroke-linecap="round"/>
+<circle cx="65" cy="49" r="4" fill="#fbe0a0"/><circle cx="128" cy="31" r="4.5" fill="#ffe7ac"/><circle cx="191" cy="49" r="4" fill="#fbe0a0"/>
+<!-- Majestic symmetrical outer mane -->
+<path d="M80 102 68 96 56 110 63 128 46 141 62 160 56 177 77 188 82 203 105 212 128 226 151 212 174 203 179 188 200 177 194 160 210 141 193 128 200 110 188 96 176 102 160 96 128 101 96 96Z" fill="#24180f" stroke="url(#gold)" stroke-width="4.2" stroke-linejoin="round"/>
+<path d="m80 105-13 27 17-6-20 25 22-8-15 25 22-8-7 26 21-14 21 40 21-40 21 14-7-26 22 8-15-25 22 8-20-25 17 6-13-27" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M78 121 88 135 75 157 94 152 90 179M178 121 168 135 181 157 162 152 166 179" fill="none" stroke="#ebc27b" stroke-opacity=".68" stroke-width="2.5" stroke-linecap="round"/>
+<!-- Face -->
+<path d="M97 110Q128 98 159 110L169 131 164 171Q151 198 128 203Q105 198 92 171L87 131Z" fill="url(#gold)" stroke="#ffe9ac" stroke-width="1.2"/>
+<path d="M100 114Q128 106 156 114L160 132 151 160 142 148 128 154 114 148 105 160 96 132Z" fill="#2a1d14" opacity=".91"/>
+<path d="M97 127Q107 117 119 129L117 138Q103 137 97 127ZM159 127Q149 117 137 129L139 138Q153 137 159 127Z" fill="#f5d394"/>
+<path d="M103 130Q111 127 117 132M153 130Q145 127 139 132" fill="none" stroke="#1b1512" stroke-width="4" stroke-linecap="round"/>
+<path d="M110 148 128 154 146 148 154 168 141 181 128 176 115 181 102 168Z" fill="#e3bf7f"/>
+<path d="M116 159 128 157 140 159 128 173Z" fill="#201713" stroke="#ffdda0" stroke-width="1"/>
+<path d="M128 173V183M128 182Q119 188 109 183M128 182Q137 188 147 183" fill="none" stroke="#281b15" stroke-width="3.6" stroke-linecap="round"/>
+<path d="m111 190 17 10 17-10" fill="none" stroke="#8b5a2c" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
