@@ -52,7 +52,8 @@ function settings(s){
  const data=s&&s.exists?s.data():{};
  const plans={...DEFAULTS.plans,...(data.plans||{})};
  const vipPackages=data.vipPackages===undefined?plans:data.vipPackages;
- return {...DEFAULTS,...data,plans,vipPackages};
+ const paymentMethods=data.paymentMethods===undefined?[{id:'manual',name:'Manual Transfer',number:data.depositNumber||'',enabled:true}]:data.paymentMethods;
+ return {...DEFAULTS,...data,plans,vipPackages,paymentMethods};
 }
 function channelUrl(value){
  const x=secureString(value,100).replace(/^@/,'https://t.me/');
@@ -249,19 +250,25 @@ async function route(req){
   if(req.method!=='POST')fail(405,'POST required');
   const type=body.type;
   if(!['deposit','withdraw'].includes(type))fail(400,'Invalid transaction type');
-  const amount=checkAmount(body.amount,1,1000000),method=secureString(body.method,70),
-   details=secureString(body.details,300);
-  if(method.length<2||details.length<5)fail(400,'Provide payment method and reference/recipient details');
+  const amount=checkAmount(body.amount,1,1000000),details=secureString(body.details,300);
+  if(details.length<5)fail(400,'Provide payment reference or recipient details');
+  const submittedMethod=secureString(body.methodId||body.method,70);
+  const current=settings(await settingRef.get());
+  const selected=current.paymentMethods.find(m=>m.enabled!==false&&(m.id===submittedMethod||m.name===submittedMethod));
+  if(!selected)fail(400,'Choose an available payment method');
+  if(type==='deposit'&&!selected.number)fail(503,'The administrator has not configured a receiving number for this method');
+  const method=selected.name;
   const reqRef=store.collection(C.money).doc(),now=Date.now();
   return await store.runTransaction(async tx=>{
    const [u,s]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
    const setting=settings(s);
    if(amount<(type==='deposit'?setting.minDeposit:setting.minWithdraw))fail(400,'Amount is below the current minimum');
-   if(type==='deposit'&&!setting.depositNumber)fail(503,'Deposit number is not configured by admin');
+   const confirmed=(setting.paymentMethods||[]).find(m=>m.id===selected.id&&m.enabled!==false);
+   if(!confirmed||(type==='deposit'&&!confirmed.number))fail(409,'Payment method was changed. Reload the app.');
    if(type==='withdraw'&&(u.data().balance||0)<amount)fail(409,'Insufficient available AFN balance');
    if(type==='withdraw')tx.update(ref,{balance:admin.firestore.FieldValue.increment(-amount),pendingWithdraw:admin.firestore.FieldValue.increment(amount)});
-   tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,method,details,status:'pending',createdAt:now,reviewedAt:0});
+   tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,method,methodId:selected.id,receivingNumber:selected.number,details,status:'pending',createdAt:now,reviewedAt:0});
    tx.set(ref.collection('activity').doc(),{label:(type==='deposit'?'Deposit':'Withdrawal')+' request submitted',amount:0,at:now});
    return {ok:true,requestId:reqRef.id};
   });
@@ -353,6 +360,29 @@ async function route(req){
     tx.set(store.collection(C.audits).doc(),{actor:id,kind:'role',target:targetId,role:newRole,at:now});
    });
    return {ok:true};
+  }
+  if(type==='savePaymentMethod'||type==='deletePaymentMethod'){
+   const paymentId=secureString(body.methodId,32);
+   if(paymentId&&!/^[a-z0-9_-]{2,32}$/.test(paymentId))fail(400,'Invalid payment method ID');
+   return await store.runTransaction(async tx=>{
+    const snap=await tx.get(settingRef),config=settings(snap),methods=[...config.paymentMethods];
+    if(type==='deletePaymentMethod'){
+     const i=methods.findIndex(m=>m.id===paymentId);
+     if(i===-1)fail(404,'Payment method not found');
+     methods.splice(i,1);
+    }else{
+     const m=body.method||{},name=secureString(m.name,45),number=secureString(m.number,40).replace(/[^\d+\-\s()]/g,'');
+     if(name.length<3)fail(400,'Payment method name must have three or more characters');
+     const idForMethod=paymentId||'pay_'+crypto.randomBytes(5).toString('hex');
+     const existingIndex=methods.findIndex(x=>x.id===idForMethod);
+     if(existingIndex<0&&methods.length>=12)fail(400,'Maximum 12 payment methods');
+     const value={id:idForMethod,name,number,enabled:m.enabled!==false};
+     if(existingIndex>=0)methods[existingIndex]=value;else methods.push(value);
+    }
+    tx.set(settingRef,{...(snap.exists?snap.data():{}),paymentMethods:methods});
+    tx.set(store.collection(C.audits).doc(),{actor:id,kind:'payment_methods',at:now,methodId:paymentId||'new'});
+    return {ok:true};
+   });
   }
   if(type==='updateUser'){
    const targetId=String(body.userId||'');
