@@ -163,6 +163,10 @@ case 'cancel-withdraw':if(confirm('Cancel this pending withdrawal and release th
 case 'admin-money-approve':if(confirm('Approve this manual payment request? Verify the real-world payment or payout first.'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:true});break;
 case 'admin-money-reject':if(confirm('Reject this payment request?'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:false});break;
 case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
+case 'admin-test-notice':await adminAction('testNotification',{});break;
+case 'admin-activate-welcome':if(confirm('Activate @Afglionbot welcome messages? This replaces any existing webhook connected to this bot.'))await adminAction('setupWelcomeWebhook',{});break;
+case 'admin-check-welcome':try{var info=await api('adminAction',{type:'checkWelcomeWebhook'});modal('Telegram /start status','<p class="body-sub"><b>Webhook:</b> '+esc(info.webhookUrl||'None')+'</p><p class="body-sub"><b>AFGLION welcome active:</b> '+(info.isAfglionWebhook?'YES ✅':'NO ❌')+'</p><p class="body-sub"><b>Pending messages:</b> '+n(info.pendingUpdates)+'</p>'+(info.error?'<div class="alert">Telegram error: '+esc(info.error)+'</div>':'')+'<div class="alert">If not active, press Activate /start welcome bot first.</div>');}catch(e){toast(e.message);}break;
+
 case 'claim':await run('claim',{},'Your daily reward has arrived!');break;
 case 'notification':modal('Announcements','<div class="notice" style="margin-top:16px"><div class="notice-icon">'+icon('bell')+'</div><div><h3>Latest announcement</h3><p>'+esc(data().settings.announcement||'Welcome to AFGLION!')+'</p></div></div>');break;
 case 'copy-ref':if(link())await copyValue(link());break;
@@ -318,6 +322,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  if(tab==='notices'){
  html+='<div class="admin-callout">Approved deposits and withdrawals can automatically send premium transaction announcements to your Telegram channel. Add @Afglionbot as a channel administrator with Post Messages permission. If a notification did not arrive, use Test below.</div>'+
  '<button class="btn btn-outline btn-block" data-action="admin-tab" data-tab="settings">Configure channel</button>'+
+ '<div class="channel-test-banner"><p>Current channel: <b>'+esc(a.settings.notificationChannel||'Not set')+'</b></p><p>Automatic notifications: <b>'+(a.settings.notifyApprovals?'ENABLED':'DISABLED')+'</b></p><button class="btn btn-primary btn-block" data-action="admin-test-notice">Send test notification</button></div>'+
  section('Pending / failed notifications')+
  ((a.notices||[]).length?a.notices.map(function(item){return '<div class="payment-review"><div class="review-header"><b>'+esc(item.type==='deposit'?'Deposit':'Withdrawal')+' · '+currency(item.amount)+'</b><span class="badge red">'+esc(item.status||'pending')+'</span></div><p>Channel: '+esc(item.channel||'Not configured')+'</p><p>'+esc(item.lastError||'Waiting for delivery')+'</p><button class="btn btn-primary btn-small" data-action="admin-retry-notice" data-id="'+esc(item.id)+'">Retry notification</button></div>';}).join(''):empty('check','All notifications delivered','There are no messages waiting for delivery.'));
  }
@@ -374,7 +379,12 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<details class="admin-section"><summary>'+icon('bell')+' Channel payment notifications <span>⌄</span></summary><div class="admin-section-body">'+
  '<label class="check-row"><input type="checkbox" id="admin-notify-enabled" '+(st.notifyApprovals?'checked':'')+'> Announce approved deposits and withdrawals</label>'+
  '<label class="form-label">Telegram notification channel (public link)</label><input class="field" id="admin-notify-channel" placeholder="https://t.me/yourchannel" value="'+esc(st.notificationChannel||'')+'">'+
- '<p class="muted-note">Bot must be an administrator with posting permission. Public posts show only AFN amount and masked member ID, never payment references, phone numbers or account details.</p></div></details>'+
+ '<p class="muted-note">The bot must be a channel administrator with posting rights. Save your channel first, then run a test. This sends a real Telegram test message, not a financial approval.</p><button type="button" class="btn btn-outline btn-block" style="margin-top:14px" data-action="admin-test-notice">Send test message to channel</button></div></details>'+
+ (a.callerRole==='owner'?'<details class="admin-section"><summary>'+icon('spark')+' Bot /start welcome message <span>⌄</span></summary><div class="admin-section-body">'+
+ '<div class="admin-callout">Bot welcome includes a stylish greeting, Open App button and official payouts channel <b>@AFGlionpayouts</b>. Activate its webhook once, then use /start inside @Afglionbot to test it. Activating replaces any existing Telegram bot webhook.</div>'+
+ '<button type="button" class="btn btn-primary btn-block" data-action="admin-activate-welcome">Activate /start welcome bot</button>'+
+ '<button type="button" class="btn btn-outline btn-block" style="margin-top:9px" data-action="admin-check-welcome">Check welcome webhook</button>'+
+ '</div></details>':'')+
  '<details class="admin-section"><summary>'+icon('settings')+' Branding & announcement <span>⌄</span></summary><div class="admin-section-body">'+
  '<label class="form-label">Announcement</label><textarea id="admin-announcement" class="field" maxlength="350">'+esc(st.announcement||'')+'</textarea>'+
  '<label class="form-label">Telegram bot username</label><input class="field" id="admin-bot" value="'+esc(st.botUsername||'Afglionbot')+'"></div></details>'+
