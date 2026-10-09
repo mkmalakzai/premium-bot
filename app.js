@@ -162,6 +162,7 @@ case 'vip-claim':await run('vipClaim',{},'VIP daily reward credited!');break;
 case 'cancel-withdraw':if(confirm('Cancel this pending withdrawal and release the reserved AFN?'))await run('cancelWithdrawal',{requestId:target.dataset.id},'Withdrawal cancelled');break;
 case 'admin-money-approve':if(confirm('Approve this manual payment request? Verify the real-world payment or payout first.'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:true});break;
 case 'admin-money-reject':if(confirm('Reject this payment request?'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:false});break;
+case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
 case 'claim':await run('claim',{},'Your daily reward has arrived!');break;
 case 'notification':modal('Announcements','<div class="notice" style="margin-top:16px"><div class="notice-icon">'+icon('bell')+'</div><div><h3>Latest announcement</h3><p>'+esc(data().settings.announcement||'Welcome to AFGLION!')+'</p></div></div>');break;
 case 'copy-ref':if(link())await copyValue(link());break;
@@ -303,6 +304,12 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
  }).join(''):empty('check','No pending payments','New deposit and withdrawal requests will show here.');
  }
+ if(tab==='notices'){
+ html+='<div class="admin-callout">Approved deposits and withdrawals can automatically send premium transaction announcements to your Telegram channel. Add @Afglionbot as an administrator with posting permission.</div>'+
+ '<button class="btn btn-outline btn-block" data-action="admin-tab" data-tab="settings">Configure channel</button>'+
+ section('Pending / failed notifications')+
+ ((a.notices||[]).length?a.notices.map(function(item){return '<div class="payment-review"><div class="review-header"><b>'+esc(item.type==='deposit'?'Deposit':'Withdrawal')+' · '+currency(item.amount)+'</b><span class="badge red">'+esc(item.status||'pending')+'</span></div><p>Channel: '+esc(item.channel||'Not configured')+'</p><p>'+esc(item.lastError||'Waiting for delivery')+'</p><button class="btn btn-primary btn-small" data-action="admin-retry-notice" data-id="'+esc(item.id)+'">Retry notification</button></div>';}).join(''):empty('check','All notifications delivered','There are no messages waiting for delivery.'));
+ }
  if(tab==='methods'){
  var methods=a.settings.paymentMethods||[];
  html+='<div class="admin-callout">Add receiving methods such as Hawala, bank or mobile wallet. The chosen number appears to customers on Deposit with a Copy button.</div>'+
@@ -349,10 +356,14 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<div class="inline-fields">'+adminNumber('Daily reward (AFN)','admin-daily',st.dailyBonus,0,1000)+adminNumber('VIP referral %','admin-referral',st.referralPercent,0,50)+'</div></div></details>'+
  '<details class="admin-section"><summary>'+icon('wallet')+' Deposit & withdrawals <span>⌄</span></summary><div class="admin-section-body">'+
  '<div class="inline-fields">'+adminNumber('Min deposit','admin-min-deposit',st.minDeposit,1,100000)+adminNumber('Min withdraw','admin-min-withdraw',st.minWithdraw,1,100000)+'</div>'+
- '<label class="form-label">Screenshot receiver (Telegram username)</label><input class="field" id="admin-deposit-contact" value="'+esc(st.depositContact||'Mk_Malakzai')+'">'+
+ '<label class="form-label">Deposit admin Telegram username (editable)</label><input class="field" id="admin-deposit-contact" value="'+esc(st.depositContact||'Mk_Malakzai')+'">'+
  '<label class="form-label">Deposit instructions</label><textarea id="admin-deposit-inst" class="field" maxlength="500">'+esc(st.depositInstructions||'')+'</textarea>'+
  '<label class="form-label">Withdrawal instructions</label><textarea id="admin-payout-inst" class="field" maxlength="500">'+esc(st.payoutInstructions||'')+'</textarea>'+
  '<label class="form-label">Legacy default receiving number (optional)</label><input class="field" id="admin-deposit-number" value="'+esc(st.depositNumber||'')+'"><p class="muted-note">For multiple methods, use Payment methods in the menu.</p></div></details>'+
+ '<details class="admin-section"><summary>'+icon('bell')+' Channel payment notifications <span>⌄</span></summary><div class="admin-section-body">'+
+ '<label class="check-row"><input type="checkbox" id="admin-notify-enabled" '+(st.notifyApprovals?'checked':'')+'> Announce approved deposits and withdrawals</label>'+
+ '<label class="form-label">Telegram notification channel (public link)</label><input class="field" id="admin-notify-channel" placeholder="https://t.me/yourchannel" value="'+esc(st.notificationChannel||'')+'">'+
+ '<p class="muted-note">Bot must be an administrator with posting permission. Public posts show only AFN amount and masked member ID, never payment references, phone numbers or account details.</p></div></details>'+
  '<details class="admin-section"><summary>'+icon('settings')+' Branding & announcement <span>⌄</span></summary><div class="admin-section-body">'+
  '<label class="form-label">Announcement</label><textarea id="admin-announcement" class="field" maxlength="350">'+esc(st.announcement||'')+'</textarea>'+
  '<label class="form-label">Telegram bot username</label><input class="field" id="admin-bot" value="'+esc(st.botUsername||'Afglionbot')+'"></div></details>'+
@@ -396,6 +407,8 @@ async function saveAdminSettings(){await adminAction('saveSettings',{
  homeChannelUrl:document.getElementById('admin-home-channel').value.trim(),
  depositNumber:document.getElementById('admin-deposit-number').value.trim(),
  depositContact:document.getElementById('admin-deposit-contact').value.trim(),
+ notifyApprovals:document.getElementById('admin-notify-enabled').checked,
+ notificationChannel:document.getElementById('admin-notify-channel').value.trim(),
  minDeposit:getNum('admin-min-deposit'),minWithdraw:getNum('admin-min-withdraw'),
  botUsername:document.getElementById('admin-bot').value.trim().replace(/^@/,''),
  depositInstructions:document.getElementById('admin-deposit-inst').value,
@@ -423,7 +436,7 @@ modal(key?'Edit VIP package':'Create VIP package',
  '<button class="btn btn-primary btn-block" style="margin-top:20px">Save VIP package</button></form>');
 }
 
-async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast('Changes saved');}catch(e){toast(e.message);}finally{state.loading=false;}}
+async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{var outcome=await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast(outcome&&outcome.notificationSent===false?'Approved, but channel post failed — open Notifications':outcome&&outcome.sent===false?'Notification failed. Check channel permissions.':'Changes saved');}catch(e){toast(e.message);}finally{state.loading=false;}}
 
 init();
 })();
