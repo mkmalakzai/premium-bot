@@ -51,3 +51,34 @@
 .profile-stat .label,.stat-small .label{font-size:11px}
 .admin-shell .inline-fields{margin-bottom:7px}
 @media(max-width:370px){.wallet-actions{gap:7px}.wallet-action{min-height:93px;padding:11px 3px}.wallet-action b{font-size:11px}.wallet-action small{font-size:8px}.admin-row{flex-wrap:wrap}.mini-actions{width:100%}}
+
+
+/* AFGLION 2.1 — consistent avatar, channel gate and enhanced admin experience */
+.topbar .header-tools{flex-shrink:0}
+.topbar .avatar-button{position:relative;flex:0 0 42px;width:42px;height:42px;min-width:42px;max-width:42px;min-height:42px;max-height:42px;overflow:hidden;padding:0;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,#423a2b,#151d2a);border:1.5px solid rgba(229,192,121,.55)}
+.profile-header-image{position:absolute!important;inset:0;width:100%!important;height:100%!important;display:block!important;border-radius:50%;object-fit:cover!important;object-position:center center!important;max-width:100%;max-height:100%;z-index:2}
+.profile-header-fallback{width:100%;height:100%;font-size:17px;font-weight:900;color:#f0d8a2;display:grid;place-items:center}
+.channel-banner{width:100%;display:flex;gap:14px;align-items:center;padding:18px 16px;background:linear-gradient(120deg,#192332,#111923);border:1px solid rgba(120,168,221,.2);border-radius:20px;color:white;text-align:left}
+.channel-banner>span:nth-child(2){flex:1;min-width:0}.channel-banner strong{font-size:13px;display:block}.channel-banner small{font-size:10px;color:var(--muted);display:block;margin-top:4px;line-height:1.5}
+.channel-icon{flex:0 0 41px;height:41px;border-radius:13px;background:rgba(98,161,220,.14);color:#8cbeee;display:grid;place-items:center}
+.channel-banner>svg{width:17px;height:17px;color:#b1c9df}
+.join-screen{text-align:center;margin:44px auto 50px;max-width:450px;padding:12px 10px}
+.join-art{position:relative;width:106px;height:106px;border-radius:32px;background:radial-gradient(circle at 25% 15%,#574628,#212029 63%,#151d2b);border:1px solid rgba(228,183,112,.35);display:grid;place-items:center;margin:0 auto 32px;box-shadow:0 18px 62px rgba(212,158,70,.14),inset 0 0 35px rgba(240,188,113,.13)}
+.join-art svg{width:49px;height:49px;color:#f6d9a7;stroke-width:1.5}
+.join-screen h1{font:800 31px/1.14 "Plus Jakarta Sans",sans-serif;letter-spacing:-.06em;margin:12px auto 13px}
+.join-screen p{font-size:13px;line-height:1.8;color:var(--muted);margin:0 0 28px}
+.join-screen .join-primary{margin-bottom:12px;min-height:53px}
+.join-screen .btn-outline{min-height:49px}
+.join-screen .alert{margin-top:25px;text-align:left;font-size:11px;line-height:1.6}
+.deposit-destination{padding:18px;border-radius:18px;border:1px solid rgba(221,184,115,.32);background:linear-gradient(145deg,#2e2b29,#1b2430);display:flex;flex-direction:column;align-items:flex-start;gap:11px}
+.deposit-destination small{color:var(--muted);font-size:11px}
+.deposit-destination strong{font-size:21px;font-family:"Plus Jakarta Sans",sans-serif;letter-spacing:.015em;color:var(--gold2);overflow-wrap:anywhere}
+.deposit-destination button{align-self:flex-start}
+.deposit-steps{margin:12px 0 20px;padding:18px;background:#111e2b;border:1px solid rgba(104,176,241,.17);border-radius:18px}
+.deposit-steps b{font-size:13px;color:white}.deposit-steps p{color:var(--muted);line-height:1.65;font-size:11px;margin:8px 0 13px}
+.deposit-steps .btn svg{width:17px;height:17px}
+.check-row{display:flex;align-items:center;gap:11px;font-size:12px;font-weight:700;background:var(--surface);border:1px solid var(--stroke);border-radius:14px;padding:15px;margin:14px 0 8px;line-height:1.5}
+.check-row input{accent-color:#d6a966;width:19px;height:19px;flex:0 0 auto}
+.package-manage{background:#151c26;border:1px solid var(--stroke);border-radius:18px;padding:17px;margin-top:12px}
+.package-manage-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.package-manage-top b{font-size:14px;display:block}.package-manage-top small{color:var(--muted);font-size:11px;margin-top:8px;display:block;line-height:1.5}.package-manage-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.package-manage-actions .btn{justify-content:center}
+@media(max-width:370px){.topbar{height:85px}.brand-name{font-size:15px}.join-screen h1{font-size:27px}.channel-banner{gap:9px;padding:14px 12px}.deposit-destination strong{font-size:18px}}
