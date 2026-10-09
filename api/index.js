@@ -14,7 +14,9 @@ const C = {
 const DEFAULTS = {
  appName:'AFGLION', botUsername:'Afglionbot',
  announcement:'Welcome to AFGLION. Deposit and withdrawal requests are reviewed manually.',
- dailyBonus:1, referralPercent:10, minDeposit:50, minWithdraw:100,
+ dailyBonus:0, dailyEnabled:false, referralPercent:10, minDeposit:50, minWithdraw:100,
+ forceJoinEnabled:true,forceJoinChannel:'https://t.me/geminipromtshub',homeChannelUrl:'https://t.me/geminipromtshub',
+ depositNumber:'',depositContact:'Mk_Malakzai',
  depositInstructions:'Send payment using the method agreed with support. Enter a genuine transaction reference; approval is manual.',
  payoutInstructions:'Withdrawals are reviewed manually. Enter a correct payment method and recipient details.',
  plans:{
@@ -40,7 +42,48 @@ function secureString(x,max){return typeof x==='string'?x.trim().slice(0,max):''
 function numericId(x){return /^\d{3,20}$/.test(String(x||''));}
 function whole(x,min,max){return typeof x==='number'&&Number.isSafeInteger(x)&&x>=min&&x<=max;}
 function checkAmount(x,min,max){if(!whole(x,min,max))fail(400,'Invalid AFN amount');return x;}
-function settings(s){const data=s&&s.exists?s.data():{};return {...DEFAULTS,...data,plans:{...DEFAULTS.plans,...(data.plans||{})}};}
+function settings(s){
+ const data=s&&s.exists?s.data():{};
+ const plans={...DEFAULTS.plans,...(data.plans||{})};
+ const vipPackages=data.vipPackages===undefined?plans:data.vipPackages;
+ return {...DEFAULTS,...data,plans,vipPackages};
+}
+function channelUrl(value){
+ const x=secureString(value,100).replace(/^@/,'https://t.me/');
+ const match=/^https:\/\/t\.me\/([A-Za-z0-9_]{5,32})\/?$/.exec(x);
+ if(!match)fail(400,'Use a public Telegram channel link (https://t.me/channelname)');
+ return 'https://t.me/'+match[1];
+}
+function botContact(value){
+ const x=secureString(value,34).replace(/^@/,'');
+ if(!/^[A-Za-z0-9_]{5,32}$/.test(x))fail(400,'Enter a valid Telegram username');
+ return x;
+}
+function safePackage(value){
+ if(!value||typeof value!=='object')fail(400,'Invalid package');
+ const name=secureString(value.name,45);
+ if(name.length<3)fail(400,'VIP package name should have at least three characters');
+ return {name,price:checkAmount(value.price,1,1000000),
+  dailyReward:checkAmount(value.dailyReward,0,100000),days:checkAmount(value.days,1,365),enabled:value.enabled!==false};
+}
+async function memberStatus(id,config){
+ const url=channelUrl(config.forceJoinChannel);
+ if(!config.forceJoinEnabled||isAdmin(id))return {joined:true,url};
+ const userName=url.split('/').pop();
+ let response,answer;
+ try{
+  response=await fetch('https://api.telegram.org/bot'+process.env.TELEGRAM_BOT_TOKEN+'/getChatMember',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({chat_id:'@'+userName,user_id:Number(id)}),
+   signal:AbortSignal.timeout(7500)
+  });
+  answer=await response.json();
+ }catch(e){return {joined:false,url,issue:'Unable to verify membership right now. Try again.'};}
+ if(!answer.ok)return {joined:false,url,issue:'Channel verification unavailable. Add the bot as channel admin.'};
+ const m=answer.result||{};
+ const joined=['creator','administrator','member'].includes(m.status)||(m.status==='restricted'&&m.is_member===true);
+ return {joined,url,issue:joined?'':'Join the channel and tap Check Joined.'};
+}
 function sessionKey(){return crypto.createHash('sha256').update('afglion-auth-1:'+process.env.TELEGRAM_BOT_TOKEN).digest();}
 function signSession(id){
  const head=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url');
@@ -90,7 +133,7 @@ async function signedIn(req,store){
  if(snap.data().banned)fail(403,'Account restricted');
  return {id,ref,snap};
 }
-function planFor(s,tier){const p=s.plans[tier];if(!p||!whole(p.price,1,1000000)||!whole(p.dailyReward,0,100000)||!whole(p.days,1,365))fail(400,'Plan is unavailable');return p;}
+function planFor(s,tier){const p=s.vipPackages[tier];if(!p||p.enabled===false||!whole(p.price,1,1000000)||!whole(p.dailyReward,0,100000)||!whole(p.days,1,365))fail(400,'VIP package is unavailable');return p;}
 function isAdmin(id){return admins().has(id);}
 async function route(req){
  const action=String(req.query.action||'');
@@ -102,6 +145,8 @@ async function route(req){
   if(req.method!=='POST')fail(405,'POST required');
   const tele=telegramIdentity(body.initData),id=tele.id,userRef=users.doc(id);
   const st=settings(await settingRef.get());
+  const membership=await memberStatus(id,st);
+  if(!membership.joined)return {joinRequired:true,joinUrl:membership.url,joinIssue:membership.issue};
   const match=/^ref_(\d{3,20})$/.exec(tele.startParam);
   const inviter=match&&match[1]!==id?match[1]:null;
   await store.runTransaction(async tx=>{
@@ -129,6 +174,13 @@ async function route(req){
   return {token:signSession(id)};
  }
  const {id,ref}=await signedIn(req,store);
+ const currentSettings=settings(await settingRef.get());
+ const membership=await memberStatus(id,currentSettings);
+ if(action==='joinStatus')return {joined:membership.joined,joinRequired:!membership.joined,joinUrl:membership.url,joinIssue:membership.issue};
+ if(!membership.joined){
+  if(action==='me')return {joinRequired:true,joinUrl:membership.url,joinIssue:membership.issue};
+  fail(403,'Join the required Telegram channel to continue');
+ }
  if(action==='me'){
   const [u,s,r,v,m,a]=await Promise.all([
    ref.get(),settingRef.get(),users.where('referrerId','==',id).limit(100).get(),
@@ -152,7 +204,9 @@ async function route(req){
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
    const last=u.data().lastClaimAt||0;
    if(now-last<DAY)fail(429,'Daily check-in is available every 24 hours');
-   const bonus=settings(s).dailyBonus;
+   const config=settings(s);
+   if(!config.dailyEnabled)fail(403,'Free daily check-in is disabled');
+   const bonus=config.dailyBonus;
    checkAmount(bonus,0,1000);
    const streak=now-last<DAY*2?(u.data().claimStreak||0)+1:1;
    tx.update(ref,{balance:admin.firestore.FieldValue.increment(bonus),totalEarned:admin.firestore.FieldValue.increment(bonus),lastClaimAt:now,claimStreak:streak});
@@ -218,7 +272,7 @@ async function route(req){
  if(action==='vipRequest'){
   if(req.method!=='POST')fail(405,'POST required');
   const tier=String(body.tier||''),requestRef=store.collection(C.requests).doc(id);
-  if(!['gold','elite'].includes(tier))fail(400,'Invalid VIP tier');
+  if(!/^[a-z0-9_-]{2,32}$/.test(tier))fail(400,'Invalid VIP package');
   return await store.runTransaction(async tx=>{
    const [u,r,s]=await Promise.all([tx.get(ref),tx.get(requestRef),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
@@ -226,7 +280,7 @@ async function route(req){
    if((u.data().balance||0)<p.price)fail(409,'Insufficient balance. Deposit AFN and wait for admin approval first.');
    if(r.exists&&r.data().status==='pending')fail(409,'VIP request already pending');
    if(u.data().vipTier===tier&&(u.data().vipUntil||0)>now)fail(409,'This VIP plan is already active');
-   tx.set(requestRef,{userId:id,name:u.data().name||'Member',tier,price:p.price,status:'pending',createdAt:now,reviewedAt:0});
+   tx.set(requestRef,{userId:id,name:u.data().name||'Member',tier,planSnapshot:p,price:p.price,status:'pending',createdAt:now,reviewedAt:0});
    return {ok:true};
   });
  }
@@ -244,24 +298,41 @@ async function route(req){
   if(req.method!=='POST')fail(405,'POST required');
   const type=String(body.type||''),now=Date.now();
   if(type==='saveSettings'){
-   const announcement=secureString(body.announcement,350),botUsername=secureString(body.botUsername,32).replace(/^@/,'');
-   if(botUsername&&!/^[A-Za-z0-9_]{5,32}$/.test(botUsername))fail(400,'Invalid bot username');
+   const announcement=secureString(body.announcement,350),botUsername=botContact(body.botUsername||'Afglionbot');
    const dailyBonus=checkAmount(body.dailyBonus,0,1000),referralPercent=checkAmount(body.referralPercent,0,50);
    const minDeposit=checkAmount(body.minDeposit,1,100000),minWithdraw=checkAmount(body.minWithdraw,1,100000);
-   const plans={};
-   for(const tier of ['gold','elite']){
-    const p=body.plans&&body.plans[tier];
-    if(!p)fail(400,'Missing VIP plan');
-    plans[tier]={name:tier==='gold'?'Gold VIP':'Elite VIP',price:checkAmount(p.price,1,1000000),
-     dailyReward:checkAmount(p.dailyReward,0,100000),days:checkAmount(p.days,1,365)};
-   }
-   await settingRef.set({appName:'AFGLION',botUsername,announcement,dailyBonus,referralPercent,minDeposit,minWithdraw,
-    depositInstructions:secureString(body.depositInstructions,500),payoutInstructions:secureString(body.payoutInstructions,500),plans},{merge:true});
+   const forceJoinChannel=channelUrl(body.forceJoinChannel),homeChannelUrl=channelUrl(body.homeChannelUrl);
+   const depositNumber=secureString(body.depositNumber,40).replace(/[^\d+\-\s()]/g,'');
+   const depositContact=botContact(body.depositContact);
+   if(typeof body.dailyEnabled!=='boolean'||typeof body.forceJoinEnabled!=='boolean')fail(400,'Invalid reward or force-join settings');
+   await settingRef.set({appName:'AFGLION',botUsername,announcement,dailyBonus,dailyEnabled:body.dailyEnabled,
+    referralPercent,minDeposit,minWithdraw,forceJoinChannel,forceJoinEnabled:body.forceJoinEnabled,
+    homeChannelUrl,depositNumber,depositContact,
+    depositInstructions:secureString(body.depositInstructions,500),
+    payoutInstructions:secureString(body.payoutInstructions,500)},{merge:true});
    return {ok:true};
+  }
+  if(type==='saveVipPackage'||type==='deleteVipPackage'){
+   const key=secureString(body.packageId,32);
+   if(key&&!/^[a-z0-9_-]{2,32}$/.test(key))fail(400,'Invalid package identifier');
+   return await store.runTransaction(async tx=>{
+    const snapshot=await tx.get(settingRef),ss=settings(snapshot),packages={...ss.vipPackages};
+    if(type==='deleteVipPackage'){
+     if(!key||!packages[key])fail(404,'VIP package not found');
+     delete packages[key];
+    }else{
+     const p=safePackage(body.package);
+     const identifier=key||'vip_'+crypto.randomBytes(6).toString('hex');
+     if(!packages[identifier]&&Object.keys(packages).length>=20)fail(400,'Maximum 20 VIP packages');
+     packages[identifier]=p;
+    }
+    tx.set(settingRef,{vipPackages:packages},{merge:true});
+    return {ok:true};
+   });
   }
   if(type==='updateUser'){
    const targetId=String(body.userId||'');
-   if(!numericId(targetId)||!['free','gold','elite'].includes(body.tier)||!whole(body.addPoints,0,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
+   if(!numericId(targetId)||!(body.tier==='free'||/^[a-z0-9_-]{2,32}$/.test(body.tier))||!whole(body.addPoints,0,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
    if(isAdmin(targetId)&&body.banned)fail(400,'Cannot ban an administrator');
    const userRef=users.doc(targetId);
    await store.runTransaction(async tx=>{
@@ -291,7 +362,7 @@ async function route(req){
     if(type==='rejectVip'){
      tx.update(requestRef,{status:'rejected',reviewedAt:now,reviewedBy:id});return {ok:true};
     }
-    const p=planFor(settings(s),r.data().tier),charge=r.data().price;
+    const p=r.data().planSnapshot||planFor(settings(s),r.data().tier),charge=r.data().price;
     if(!whole(charge,1,1000000)||(u.data().balance||0)<charge)fail(409,'Insufficient member balance');
     const parentId=u.data().referrerId;
     const parentRef=parentId?users.doc(parentId):null,parent=parentRef?await tx.get(parentRef):null;
