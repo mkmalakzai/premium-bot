@@ -48,7 +48,7 @@ function nav(){return '<nav class="bottom-nav" aria-label="Main navigation">'+[
 
 function currency(v){return n(v)+' AFN';}
 function vipName(u){u=u||user();if(!u.vipTier||u.vipTier==='free')return 'Free';var p=u.vipPlanSnapshot||((data().settings.vipPackages||data().settings.plans||{})[u.vipTier]);if(p&&p.name)return p.name;return /^vip_/.test(u.vipTier)?'VIP Member':u.vipTier.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
-function setTheme(){document.documentElement.setAttribute('data-theme',state.theme);}
+function setTheme(){document.documentElement.setAttribute('data-theme',state.theme);try{if(tg){tg.setHeaderColor(state.theme==='light'?'#f2f4f8':'#090c12');tg.setBackgroundColor(state.theme==='light'?'#f2f4f8':'#090c12');}}catch(e){}}
 function toggleTheme(){state.theme=state.theme==='dark'?'light':'dark';try{localStorage.setItem('afglion_theme',state.theme);}catch(e){}setTheme();render();toast(state.theme==='light'?'Light mode on':'Dark mode on');}
 function activePlan(){var u=user(),p=u.vipPlanSnapshot||(data().settings.vipPackages||data().settings.plans||{})[u.vipTier];return p&&u.vipUntil>Date.now()-86400000?p:null;}
 function vipSlot(){var u=user(),p=activePlan();return p&&u.vipActivatedAt?Math.min(p.days,Math.floor((Date.now()-u.vipActivatedAt)/86400000)):0;}
@@ -194,7 +194,7 @@ function adminTabs(){
  return '<button class="admin-side-link '+(state.adminTab===i[0]?'active':'')+'" data-action="admin-tab" data-tab="'+i[0]+'">'+icon(i[2])+'<span>'+esc(i[1])+'</span>'+(state.adminTab===i[0]?'<span class="admin-link-current"></span>':'')+'</button>';}).join('');
  return '<div class="admin-nav-group"><div class="admin-nav-group-title">'+esc(section.group)+'</div>'+buttons+'</div>';
  }).join('');
- return (state.adminNavOpen?'<div class="admin-drawer-shade" data-action="admin-toggle-nav"></div><aside class="admin-drawer" aria-label="Administrator menu"><div class="admin-drawer-top"><div><span class="eyebrow">AFGLION</span><h3>Control Center</h3></div><button class="round-button" data-action="admin-toggle-nav" aria-label="Close menu">×</button></div>'+content+'<div class="admin-drawer-foot">Role: '+esc((state.admin.callerRole||'admin').toUpperCase())+'</div></aside>':'');
+ return (state.adminNavOpen?'<div class="admin-drawer-shade" data-action="admin-toggle-nav"></div><aside class="admin-drawer" aria-label="Administrator menu"><div class="admin-drawer-top"><div><span class="eyebrow">AFGLION</span><h3>Control Center</h3></div><button class="round-button" data-action="admin-toggle-nav" aria-label="Close menu">×</button></div>'+content+'<button class="admin-side-link" data-action="theme-toggle">'+icon('settings')+'<span>'+(state.theme==='dark'?'Light appearance':'Dark appearance')+'</span></button><div class="admin-drawer-foot">Role: '+esc((state.admin.callerRole||'admin').toUpperCase())+'</div></aside>':'');
 }
 function adminUserRows(users){
  var plans=state.admin.settings.vipPackages||state.admin.settings.plans||{};
