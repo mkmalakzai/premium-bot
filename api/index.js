@@ -117,7 +117,7 @@ async function route(req){
     photoUrl:typeof who.photo_url==='string'&&who.photo_url.startsWith('https://')?who.photo_url.slice(0,800):'',
     referrerId:eligible?inviter:null, balance:0, totalEarned:0,totalDeposited:0,totalWithdrawn:0,pendingWithdraw:0,
     referralCount:0,referralEarned:0,vipTier:'free',vipUntil:0,vipActivatedAt:0,
-    vipDaysClaimed:0,vipLastClaimSlot:0,lastClaimAt:0,claimStreak:0,joinedAt:now,banned:false
+    vipDaysClaimed:0,vipLastClaimSlot:0,vipPlanSnapshot:null,lastClaimAt:0,claimStreak:0,joinedAt:now,banned:false
    });
    if(eligible){
     tx.update(parentRef,{referralCount:admin.firestore.FieldValue.increment(1)});
@@ -166,7 +166,7 @@ async function route(req){
   return await store.runTransaction(async tx=>{
    const [u,s]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
-   const usr=u.data(),p=planFor(settings(s),usr.vipTier);
+   const usr=u.data(),p=usr.vipPlanSnapshot||planFor(settings(s),usr.vipTier);
    const began=usr.vipActivatedAt||0, until=usr.vipUntil||0;
    const slot=Math.min(p.days,Math.floor((now-began)/DAY));
    if(!began||!until||now>until+DAY||slot<1||slot<=(usr.vipLastClaimSlot||0))fail(409,'Next VIP reward is not available yet');
@@ -271,7 +271,7 @@ async function route(req){
     if(u.data().vipTier!==body.tier||(body.tier!=='free'&&(u.data().vipUntil||0)<now)){
      const p=body.tier==='free'?null:planFor(settings(await tx.get(settingRef)),body.tier);
      update.vipTier=body.tier;update.vipActivatedAt=p?now:0;
-     update.vipUntil=p?now+p.days*DAY:0;update.vipLastClaimSlot=0;update.vipDaysClaimed=0;
+     update.vipUntil=p?now+p.days*DAY:0;update.vipPlanSnapshot=p||null;update.vipLastClaimSlot=0;update.vipDaysClaimed=0;
     }
     if(body.addPoints>0){
      update.balance=admin.firestore.FieldValue.increment(body.addPoints);
@@ -296,7 +296,7 @@ async function route(req){
     const parentId=u.data().referrerId;
     const parentRef=parentId?users.doc(parentId):null,parent=parentRef?await tx.get(parentRef):null;
     tx.update(target,{balance:admin.firestore.FieldValue.increment(-charge),vipTier:r.data().tier,
-     vipActivatedAt:now,vipUntil:now+p.days*DAY,vipDaysClaimed:0,vipLastClaimSlot:0});
+     vipActivatedAt:now,vipUntil:now+p.days*DAY,vipPlanSnapshot:p,vipDaysClaimed:0,vipLastClaimSlot:0});
     tx.update(requestRef,{status:'approved',reviewedAt:now,reviewedBy:id,chargedAmount:charge});
     tx.set(target.collection('activity').doc(),{label:r.data().tier.toUpperCase()+' VIP purchase',amount:-charge,at:now});
     const pct=settings(s).referralPercent||0,award=Math.floor(charge*pct/100);
