@@ -157,3 +157,36 @@
 .payment-intro svg{color:var(--gold);margin-top:2px}
 .modal .form-label{margin-top:15px}
 @media(max-width:370px){.hero-foot{gap:6px}.hero-stamp{max-width:52%;font-size:8px;padding:6px}.admin-section-body{padding:0 12px 15px}.admin-context h1{font-size:24px}.admin-row{flex-wrap:wrap}}
+
+
+/* AFGLION light appearance */
+html[data-theme="light"]{
+--bg:#f2f4f8;--surface:#fff;--surface2:#ecf0f7;
+--stroke:rgba(25,42,65,.12);--muted:#67738a;--text:#1c293c;
+--gold:#b4823b;--gold2:#966722;--nav:#fff;--green:#15835c;--red:#bc4f5a;
+--shadow:0 14px 40px rgba(30,49,80,.13);color-scheme:light}
+html[data-theme="light"] body{background:#f2f4f8;color:var(--text)}
+html[data-theme="light"] .app-shell{background:#f8f9fc;border-color:rgba(25,42,65,.07)}
+html[data-theme="light"] .brand-name,html[data-theme="light"] .greeting b,html[data-theme="light"] .section-head h2,html[data-theme="light"] .profile-name{color:var(--text)}
+html[data-theme="light"] .brand-kicker{color:#78849a}
+html[data-theme="light"] .round-button,html[data-theme="light"] .avatar-button{background:#fff;border-color:#dee4ed;color:#37465d}
+html[data-theme="light"] .stat-small,html[data-theme="light"] .admin-card,html[data-theme="light"] .tier,html[data-theme="light"] .settings-list,html[data-theme="light"] .profile-stat,html[data-theme="light"] .admin-row,html[data-theme="light"] .package-manage{background:#fff;color:var(--text);border-color:#e4e9f0;box-shadow:0 7px 22px rgba(27,48,73,.025)}
+html[data-theme="light"] .action-tile,html[data-theme="light"] .admin-shortcut,html[data-theme="light"] .earning-card{background:#fff;border-color:#e2e7ee;color:var(--text)}
+html[data-theme="light"] .action-title,html[data-theme="light"] .settings-item,html[data-theme="light"] .tier-title,html[data-theme="light"] .tier-feature,html[data-theme="light"] .admin-card b,html[data-theme="light"] .admin-context h1{color:var(--text)}
+html[data-theme="light"] .tier.premium{background:linear-gradient(145deg,#fff9ed,#fff);border-color:#ebcf9d}
+html[data-theme="light"] .tier-price,html[data-theme="light"] .plan-big b,html[data-theme="light"] .stat-small .value.gold{color:#966b2b}
+html[data-theme="light"] .tier-benefits{border-color:#e4e9f0}
+html[data-theme="light"] .admin-section,html[data-theme="light"] .settings-list{background:#fff;border-color:#e1e7ee}
+html[data-theme="light"] .field{background:#f6f8fb;border-color:#dce3ec;color:#26354a}
+html[data-theme="light"] .field::placeholder{color:#8592a3}
+html[data-theme="light"] .form-label{color:#53647b}
+html[data-theme="light"] .admin-callout,html[data-theme="light"] .alert{background:#fff7ea;border-color:#ecd8b8;color:#856633}
+html[data-theme="light"] .bottom-nav{background:rgba(255,255,255,.96);border-color:#e1e8ef;box-shadow:0 -5px 25px rgba(31,50,79,.07)}
+html[data-theme="light"] .nav-item{color:#788399}
+html[data-theme="light"] .nav-item.active{color:#a5782f}
+html[data-theme="light"] .modal{background:#fff;color:var(--text);border-color:#e4e9f0}
+html[data-theme="light"] .btn-ghost{background:#f0f3f8;color:#34435c;border-color:#e1e7ef}
+html[data-theme="light"] .btn-outline{background:#fffaed;color:#926425;border-color:#ead6ac}
+html[data-theme="light"] .blank-state{background:#fff;border-color:#dce3eb}
+html[data-theme="light"] .blank-state h3{color:#253449}
+html[data-theme="light"] .blank-state .round-icon{background:#fff3da}
