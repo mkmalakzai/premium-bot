@@ -254,6 +254,25 @@ async function route(req){
   if(action==='me')return {joinRequired:true,joinUrl:membership.url,joinIssue:membership.issue};
   fail(403,'Join the required Telegram channel to continue');
  }
+ if(action==='claimAdEarnings'){
+  if(req.method!=='POST')fail(405,'POST required');
+  const now=Date.now();
+  return await store.runTransaction(async tx=>{
+   const u=await tx.get(ref);
+   if(!u.exists||u.data().banned)fail(403,'Account restricted');
+   const current=Math.round(Number(u.data().earningsBalance||0)*100);
+   if(!Number.isSafeInteger(current)||current<1000)fail(409,'Earn at least 10 AFN before claiming to your main wallet');
+   const amount=current/100;
+   tx.update(ref,{
+    earningsBalance:0,
+    earningsClaimed:admin.firestore.FieldValue.increment(amount),
+    balance:admin.firestore.FieldValue.increment(amount),
+    totalEarned:admin.firestore.FieldValue.increment(amount)
+   });
+   tx.set(ref.collection('activity').doc(),{label:'Ads earnings transferred to main wallet',amount,wallet:'main',at:now});
+   return {ok:true,amount};
+  });
+ }
  if(action==='adBegin'){
   if(req.method!=='POST')fail(405,'POST required');
   const now=Date.now(),day=new Date(now).toISOString().slice(0,10),ss=settings(await settingRef.get());
