@@ -80,7 +80,7 @@ function finishSplash(){
 
 function header(){var u=user(),picture='<span class="profile-header-fallback">'+esc((u.name||'A').charAt(0).toUpperCase())+'</span>'+(u.photoUrl?'<img class="profile-header-image" src="'+esc(u.photoUrl)+'" alt="Profile image" loading="lazy" onerror="this.remove()">':'');return '<header class="topbar"><div class="brand-wrap">'+logoMark()+'<div><div class="brand-name">AFGLION</div><div class="brand-kicker">MEMBERS CLUB</div></div></div><div class="header-tools"><button class="round-button" data-action="notification" aria-label="Notifications">'+icon('bell')+'</button><button class="avatar-button" data-page="profile" aria-label="Open profile">'+picture+'</button></div></header>';}
 function nav(){return '<nav class="bottom-nav" aria-label="Main navigation">'+[
- ['home','home','Home'],['vip','crown','VIP'],['referral','users','Referral'],['profile','profile','Profile']
+ ['home','home','Home'],['vip','crown','VIP'],['referral','users','Referral'],['earn','gift','Earn'],['profile','profile','Profile']
 ].map(function(v){return '<button class="nav-item '+(state.page===v[0]?'active':'')+'" data-page="'+v[0]+'" aria-label="'+v[2]+'">'+icon(v[1])+'<span>'+v[2]+'</span></button>';}).join('')+'</nav>';}
 
 function currency(v){return n(v)+' AFN';}
@@ -129,8 +129,39 @@ section('Appearance & more')+'<div class="settings-list"><button class="settings
 function footer(){return '<div class="footer-sign"><img src="/afglion-logo.svg" width="23" height="23" alt="AFGLION"><span>AFGLION MEMBERS CLUB</span></div>';}
 
 function joinGate(){setTheme();var gate=state.gate||{joinUrl:'https://t.me/geminipromtshub'};root.className='app-shell';root.innerHTML='<header class="topbar"><div class="brand-wrap">'+logoMark()+'<div><div class="brand-name">AFGLION</div><div class="brand-kicker">MEMBERS CLUB</div></div></div></header><div class="join-screen"><div class="join-art">'+icon('users')+'</div><span class="eyebrow">ONE QUICK STEP</span><h1>Join our channel<br>to continue.</h1><p>Membership is verified through Telegram. Join the required channel to unlock AFGLION.</p><button class="btn btn-primary btn-block join-primary" data-action="open-link" data-url="'+esc(gate.joinUrl)+'">'+icon('external')+' Join channel</button><button class="btn btn-outline btn-block" data-action="check-join">'+icon('check')+' Check Joined</button><div class="alert">'+icon('shield')+' '+esc(gate.joinIssue||'After joining, tap Check Joined. The bot must be a channel administrator for reliable checks.')+'</div></div>';}
-function render(){if(state.gate){joinGate();return;}if(!state.data)state.data=demoData;var body=state.page==='home'?home():state.page==='referral'?referral():state.page==='vip'?vip():state.page==='wallet'?wallet():profile();root.className='app-shell'+(state.page==='admin'?' admin-shell':'');if(state.page==='admin'){renderAdmin();return;}setTheme();root.innerHTML=header()+(state.demo?'<div class="alert" style="margin-top:0">Preview mode · Open through Telegram for live data.</div>':'')+body+nav();}
-function go(page){if(page==='admin'){if(!user().isAdmin){toast('Admin only');return;}state.page='admin';loadAdmin();return;}if(!['home','referral','vip','profile','wallet'].includes(page))return;state.page=page;render();window.scrollTo({top:0,behavior:'smooth'});try{tg&&tg.HapticFeedback&&tg.HapticFeedback.selectionChanged();}catch(e){}}
+var adBusy=false;
+function earn(){
+ var u=user(),st=data().settings,day=new Date().toISOString().slice(0,10);
+ var count=u.adsDay===day?(u.adsToday||0):0,limit=st.adsDailyLimit||5,enabled=st.adsEnabled&&st.adsReward>0;
+ return '<div class="view">'+goldTitle('Watch & Earn.','Earn from optional AdsGram sponsored videos.')+
+ '<div class="hero-card" style="padding:22px"><div class="eyebrow">EARNINGS WALLET</div><h1 class="page-title" style="margin:12px 0">'+currency(u.earningsBalance||0)+'</h1><div class="body-sub">Separate from your main AFN wallet</div></div>'+
+ '<div class="stats-row"><div class="stat-small"><div class="label">Lifetime earned</div><div class="value">'+currency(u.earningsTotal||0)+'</div></div><div class="stat-small"><div class="label">Ads today</div><div class="value">'+n(count)+' / '+n(limit)+'</div></div></div>'+
+ section('Rewarded advertisements')+
+ '<div class="daily-card" style="display:block"><div class="daily-title">🎬 Watch a sponsored ad</div><p class="body-sub">Reward: '+currency(st.adsReward||0)+' per verified view. No reward is given for skipped or unavailable ads.</p>'+
+ '<button class="btn btn-primary btn-block" data-action="earn-watch" '+(!enabled||count>=limit||state.demo?'disabled':'')+'>'+(enabled?'▶ WATCH AD & EARN':'COMING SOON')+'</button></div>'+
+ '<p class="body-sub" style="margin-top:18px">Ad rewards remain in your Earnings Balance. Cash withdrawal or transfers are not available until a separate payout policy is published.</p></div>';
+}
+async function watchAd(){
+ if(adBusy||state.demo)return;
+ if(!window.Adsgram||!window.Adsgram.init)return toast('AdsGram is loading. Try again shortly.');
+ adBusy=true;
+ try{
+  var started=await api('adBegin',{});
+  var controller=window.Adsgram.init({blockId:String(started.blockId)});
+  var result=await controller.show();
+  if(!result||result.done!==true)throw Error('Ad not completed.');
+  toast('Ad completed. Waiting for secure AdsGram confirmation...');
+  for(var attempt=0;attempt<5;attempt++){
+   await new Promise(function(resolve){setTimeout(resolve,2000);});
+   var status=await api('adStatus');
+   if(status.pendingUntil===0){await refresh();toast('Verified ad reward processed.');break;}
+  }
+  await refresh();
+ }catch(e){toast(e.message||'Ad unavailable or skipped. No reward credited.');}
+ finally{adBusy=false;}
+}
+function render(){if(state.gate){joinGate();return;}if(!state.data)state.data=demoData;var body=state.page==='home'?home():state.page==='referral'?referral():state.page==='vip'?vip():state.page==='wallet'?wallet():state.page==='earn'?earn():profile();root.className='app-shell'+(state.page==='admin'?' admin-shell':'');if(state.page==='admin'){renderAdmin();return;}setTheme();root.innerHTML=header()+(state.demo?'<div class="alert" style="margin-top:0">Preview mode · Open through Telegram for live data.</div>':'')+body+nav();}
+function go(page){if(page==='admin'){if(!user().isAdmin){toast('Admin only');return;}state.page='admin';loadAdmin();return;}if(!['home','referral','vip','profile','wallet','earn'].includes(page))return;state.page=page;render();window.scrollTo({top:0,behavior:'smooth'});try{tg&&tg.HapticFeedback&&tg.HapticFeedback.selectionChanged();}catch(e){}}
 async function api(action,payload){var res=await fetch('/api/index?action='+encodeURIComponent(action),{method:payload?'POST':'GET',headers:{'Content-Type':'application/json','Authorization':state.token?'Bearer '+state.token:''},body:payload?JSON.stringify(payload):undefined});var json=await res.json().catch(function(){return {error:'Server unavailable'};});if(!res.ok)throw new Error(json.error||'Request failed');return json;}
 async function refresh(){if(state.demo)return;splashStage('Loading your account',71);var response=await api('me');if(response.joinRequired){state.gate=response;state.data=null;render();return;}state.gate=null;state.data=response;render();}
 async function telegramLogin(){if(!tg||!tg.initData)return;splashStage('Verifying your membership',53);var response=await api('auth',{initData:tg.initData});if(response.joinRequired){state.gate=response;render();return;}state.gate=null;state.token=response.token;sessionStorage.setItem('afglion_session',state.token);await refresh();}
@@ -164,12 +195,16 @@ case 'admin-money-approve':if(confirm('Approve this manual payment request? Veri
 case 'admin-money-reject':if(confirm('Reject this payment request?'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:false});break;
 case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
 case 'admin-test-notice':await adminAction('testNotification',{});break;
+case 'ads-save':await adminAction('saveAdsSettings',{adsEnabled:document.getElementById('ads-enabled').checked,adsReward:Number(document.getElementById('ads-reward').value),adsDailyLimit:Number(document.getElementById('ads-limit').value)});break;
+case 'ads-callback':try{var linkResult=await api('adminAction',{type:'adsCallbackUrl'});modal('AdsGram Reward URL','<p class="body-sub">Paste this confidential URL into AdsGram Block 52925 Reward URL. Do not share it publicly.</p><textarea class="field" rows="5" readonly>'+esc(linkResult.url)+'</textarea>');}catch(e){toast(e.message);}break;
+
 case 'broadcast-start':await beginBroadcast();break;
 case 'broadcast-continue':await advanceBroadcast();break;
 
 case 'admin-activate-welcome':if(confirm('Activate @Afglionbot welcome messages? This replaces any existing webhook connected to this bot.'))await adminAction('setupWelcomeWebhook',{});break;
 case 'admin-check-welcome':try{var info=await api('adminAction',{type:'checkWelcomeWebhook'});modal('Telegram /start status','<p class="body-sub"><b>Webhook:</b> '+esc(info.webhookUrl||'None')+'</p><p class="body-sub"><b>AFGLION welcome active:</b> '+(info.isAfglionWebhook?'YES ✅':'NO ❌')+'</p><p class="body-sub"><b>Pending messages:</b> '+n(info.pendingUpdates)+'</p>'+(info.error?'<div class="alert">Telegram error: '+esc(info.error)+'</div>':'')+'<div class="alert">If not active, press Activate /start welcome bot first.</div>');}catch(e){toast(e.message);}break;
 
+case 'earn-watch':await watchAd();break;
 case 'claim':await run('claim',{},'Your daily reward has arrived!');break;
 case 'notification':modal('Announcements','<div class="notice" style="margin-top:16px"><div class="notice-icon">'+icon('bell')+'</div><div><h3>Latest announcement</h3><p>'+esc(data().settings.announcement||'Welcome to AFGLION!')+'</p></div></div>');break;
 case 'copy-ref':if(link())await copyValue(link());break;
@@ -264,7 +299,7 @@ async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegra
 
 var adminNavigation=[
  {group:'Main',items:[['overview','Dashboard','home'],['users','Members','users']]},
- {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['notices','Channel notifications','bell'],['broadcast','Broadcast','bell']]},
+ {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['notices','Channel notifications','bell'],['broadcast','Broadcast','bell'],['ads','AdsGram','gift']]},
  {group:'Subscriptions',items:[['packages','VIP packages','crown']]},
  {group:'Configuration',items:[['settings','Settings','settings'],['branding','Official brand kit','spark'],['staff','Staff & owners','shield']]}
 ];
@@ -321,6 +356,16 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<p>'+(req.type==='deposit'?'Deposit transfer reference: ':'Withdrawal recipient: ')+esc(req.type==='deposit'?(req.paymentReference||req.details):(req.payoutRecipient||req.details))+'</p><small>'+fmtDate(req.createdAt)+'</small>'+
  '<div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
  }).join(''):empty('check','No pending payments','New deposit and withdrawal requests will show here.');
+ }
+ if(tab==='ads'){
+ var cfg=a.settings||{};
+ html+='<div class="admin-callout"><b>AdsGram · Rewarded Ads</b><p>Ad Block 52925. Rewards are credited only after the secure AdsGram server callback.</p></div>'+
+ '<div class="panel"><label class="check-row"><input type="checkbox" id="ads-enabled" '+(cfg.adsEnabled?'checked':'')+'> Enable Watch & Earn</label>'+
+ '<label class="form-label">Reward per verified ad (AFN)</label><input type="number" class="field" id="ads-reward" min="0" max="10" step="0.01" value="'+esc(cfg.adsReward||0)+'">'+
+ '<label class="form-label">Daily ad limit</label><input type="number" class="field" id="ads-limit" min="1" max="20" value="'+esc(cfg.adsDailyLimit||5)+'">'+
+ '<p class="muted-note">Start with a small reward based on actual AdsGram earnings. No automatic cash payouts are enabled.</p>'+
+ '<button class="btn btn-primary btn-block" data-action="ads-save">Save Ads Settings</button>'+
+ '<button class="btn btn-outline btn-block" data-action="ads-callback">Get secure AdsGram Reward URL</button></div>';
  }
  if(tab==='broadcast'){
  html+='<div class="admin-callout"><b>Official member broadcast</b><p>Send an announcement to Telegram users who have previously opened the Mini App. Only the owner can launch a broadcast. Telegram users who blocked the bot or never started it may not receive messages.</p></div>'+
