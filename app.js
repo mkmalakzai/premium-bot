@@ -139,7 +139,8 @@ function earn(){
  section('Rewarded advertisements')+
  '<div class="daily-card" style="display:block"><div class="daily-title">🎬 Watch a sponsored ad</div><p class="body-sub">Reward: '+currency(st.adsReward||0)+' per verified view. No reward is given for skipped or unavailable ads.</p>'+
  '<button class="btn btn-primary btn-block" data-action="earn-watch" '+(!enabled||count>=limit||state.demo?'disabled':'')+'>'+(enabled?'▶ WATCH AD & EARN':'COMING SOON')+'</button></div>'+
- '<p class="body-sub" style="margin-top:18px">Ad rewards remain in your Earnings Balance. Cash withdrawal or transfers are not available until a separate payout policy is published.</p></div>';
+ '<p class="body-sub" style="margin-top:18px">Minimum claim: 10 AFN. All earnings transfer to your main AFGLION wallet.</p>'+
+ '<button class="btn btn-primary btn-block" data-action="earn-claim" '+((u.earningsBalance||0)<10||state.demo?'disabled':'')+'>Claim '+currency(u.earningsBalance||0)+' to Main Wallet</button></div>';
 }
 async function watchAd(){
  if(adBusy||state.demo)return;
@@ -205,6 +206,7 @@ case 'admin-activate-welcome':if(confirm('Activate @Afglionbot welcome messages?
 case 'admin-check-welcome':try{var info=await api('adminAction',{type:'checkWelcomeWebhook'});modal('Telegram /start status','<p class="body-sub"><b>Webhook:</b> '+esc(info.webhookUrl||'None')+'</p><p class="body-sub"><b>AFGLION welcome active:</b> '+(info.isAfglionWebhook?'YES ✅':'NO ❌')+'</p><p class="body-sub"><b>Pending messages:</b> '+n(info.pendingUpdates)+'</p>'+(info.error?'<div class="alert">Telegram error: '+esc(info.error)+'</div>':'')+'<div class="alert">If not active, press Activate /start welcome bot first.</div>');}catch(e){toast(e.message);}break;
 
 case 'earn-watch':await watchAd();break;
+case 'earn-claim':await run('claimAdEarnings',{},'Earnings transferred to your main wallet!');break;
 case 'claim':await run('claim',{},'Your daily reward has arrived!');break;
 case 'notification':modal('Announcements','<div class="notice" style="margin-top:16px"><div class="notice-icon">'+icon('bell')+'</div><div><h3>Latest announcement</h3><p>'+esc(data().settings.announcement||'Welcome to AFGLION!')+'</p></div></div>');break;
 case 'copy-ref':if(link())await copyValue(link());break;
