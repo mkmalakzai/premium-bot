@@ -29,7 +29,7 @@ var icons = {
 };
 function icon(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[n]||icons.spark)+'</svg>';}
 function esc(s){return String(s == null ? '' : s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function n(v){return Number(v||0).toLocaleString('en-US',{maximumFractionDigits:0});}
+function n(v){return Number(v||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
 function fmtDate(ms){return ms ? new Date(ms).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';}
 function avatar(user,cls){var name=(user.name||user.firstName||'G').trim();return '<div class="'+(cls||'user-avatar')+'">'+(user.photoUrl ? '<img src="'+esc(user.photoUrl)+'" alt="">' : esc(name.charAt(0).toUpperCase()))+'</div>';}
 var state={theme:(function(){try{return localStorage.getItem('afglion_theme')==='light'?'light':'dark';}catch(_){return 'dark';}})(),adminNavOpen:false,gate:null,page:'home',data:null,token:sessionStorage.getItem('afglion_session')||'',demo:!tg || !tg.initData,loading:false,admin:null,adminTab:'overview',configMissing:false};
