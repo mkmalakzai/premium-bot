@@ -9,11 +9,12 @@ const admin = require('firebase-admin');
 const DAY = 86400000;
 const C = {
  users:'veloraUsers', settings:'veloraSettings', requests:'veloraVipRequests',
- money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit', notices:'veloraApprovalNotices', broadcasts:'veloraBroadcasts'
+ money:'veloraMoneyRequests', awards:'veloraReferralAwards', roles:'veloraStaffRoles', audits:'veloraAdminAudit', notices:'veloraApprovalNotices', broadcasts:'veloraBroadcasts', adEvents:'veloraAdEvents'
 };
 const DEFAULTS = {
  appName:'AFGLION', botUsername:'Afglionbot',
  announcement:'Welcome to AFGLION. Deposit and withdrawal requests are reviewed manually.',
+ adsEnabled:false, adsBlockId:'52925', adsReward:0, adsDailyLimit:5,
  dailyBonus:0, dailyEnabled:false, referralPercent:10, minDeposit:50, minWithdraw:100,
  forceJoinEnabled:true,forceJoinChannel:'https://t.me/geminipromtshub',homeChannelUrl:'https://t.me/geminipromtshub',
  depositNumber:'',depositContact:'Mk_Malakzai',
@@ -193,6 +194,26 @@ async function route(req){
  if(!ready())fail(503,'Backend not configured. Add TELEGRAM_BOT_TOKEN and FIREBASE_SERVICE_ACCOUNT_JSON on Vercel.');
  const store=db(),users=store.collection(C.users),settingRef=store.collection(C.settings).doc('global');
  const body=req.body||{};
+ if(action==='adsgramCallback'){
+  if(req.method!=='GET')fail(405,'GET required');
+  const userId=String(req.query.userId||''),provided=String(req.query.key||'');
+  const expected=crypto.createHmac('sha256',process.env.TELEGRAM_BOT_TOKEN).update('afglion-adsgram-callback-v1').digest('hex');
+  if(!/^\d{3,20}$/.test(userId)||provided.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(provided),Buffer.from(expected)))fail(403,'Unauthorized callback');
+  const ref=users.doc(userId),now=Date.now(),ss=settings(await settingRef.get());
+  if(!ss.adsEnabled||ss.adsBlockId!=='52925'||!ss.adsReward)return {ok:true,credited:false};
+  return await store.runTransaction(async tx=>{
+   const snap=await tx.get(ref);
+   if(!snap.exists||snap.data().banned)return {ok:true,credited:false};
+   const u=snap.data(),pending=u.adsPending||{},day=new Date(now).toISOString().slice(0,10);
+   if(!pending.id||pending.expiresAt<now||pending.createdAt>now||pending.createdAt<now-600000||pending.day!==day)return {ok:true,credited:false};
+   const count=u.adsDay===day?(u.adsToday||0):0;
+   if(count>=ss.adsDailyLimit)return {ok:true,credited:false};
+   const reward=ss.adsReward;
+   tx.update(ref,{earningsBalance:admin.firestore.FieldValue.increment(reward),earningsTotal:admin.firestore.FieldValue.increment(reward),adsToday:count+1,adsDay:day,adsPending:admin.firestore.FieldValue.delete(),adsLastRewardAt:now});
+   tx.set(ref.collection('activity').doc(),{label:'AdsGram rewarded ad',amount:reward,wallet:'earnings',at:now});
+   return {ok:true,credited:true};
+  });
+ }
  if(action==='auth'){
   if(req.method!=='POST')fail(405,'POST required');
   const tele=telegramIdentity(body.initData),id=tele.id,userRef=users.doc(id);
@@ -232,6 +253,27 @@ async function route(req){
  if(!membership.joined){
   if(action==='me')return {joinRequired:true,joinUrl:membership.url,joinIssue:membership.issue};
   fail(403,'Join the required Telegram channel to continue');
+ }
+ if(action==='adBegin'){
+  if(req.method!=='POST')fail(405,'POST required');
+  const now=Date.now(),day=new Date(now).toISOString().slice(0,10),ss=settings(await settingRef.get());
+  if(!ss.adsEnabled||ss.adsBlockId!=='52925'||ss.adsReward<=0)fail(403,'Watch & Earn is not enabled yet');
+  return store.runTransaction(async tx=>{
+   const u=await tx.get(ref);
+   if(!u.exists||u.data().banned)fail(403,'Account restricted');
+   const count=u.data().adsDay===day?(u.data().adsToday||0):0;
+   if(count>=ss.adsDailyLimit)fail(429,'Daily ad limit reached');
+   const pending=u.data().adsPending||{};
+   if(pending.expiresAt>now)fail(429,'An ad session is already active. Wait a moment.');
+   const session={id:crypto.randomUUID(),createdAt:now,expiresAt:now+300000,day};
+   tx.update(ref,{adsPending:session});
+   return {ok:true,blockId:ss.adsBlockId,expiresAt:session.expiresAt};
+  });
+ }
+ if(action==='adStatus'){
+  const [u,ss]=await Promise.all([ref.get(),settingRef.get()]);
+  const d=u.data(),config=settings(ss),day=new Date().toISOString().slice(0,10);
+  return {ok:true,enabled:!!config.adsEnabled,blockId:config.adsBlockId,reward:config.adsReward,dailyLimit:config.adsDailyLimit,today:d.adsDay===day?(d.adsToday||0):0,earningsBalance:d.earningsBalance||0,earningsTotal:d.earningsTotal||0,pendingUntil:d.adsPending?.expiresAt||0};
  }
  if(action==='me'){
   const [u,s,r,v,m,a]=await Promise.all([
@@ -479,6 +521,19 @@ async function route(req){
   }
   // VIP purchases are automatically activated in one Firestore transaction; no manual VIP approvals.
 
+  if(type==='saveAdsSettings'){
+   if(role!=='owner')fail(403,'Owner only');
+   const adsEnabled=body.adsEnabled===true,adsReward=Number(body.adsReward),adsDailyLimit=Number(body.adsDailyLimit);
+   if(!Number.isFinite(adsReward)||adsReward<0||adsReward>10||Math.round(adsReward*100)!==adsReward*100)fail(400,'Invalid ad reward');
+   if(!Number.isInteger(adsDailyLimit)||adsDailyLimit<1||adsDailyLimit>20)fail(400,'Invalid daily limit');
+   await settingRef.set({adsEnabled,adsBlockId:'52925',adsReward,adsDailyLimit},{merge:true});
+   return {ok:true};
+  }
+  if(type==='adsCallbackUrl'){
+   if(role!=='owner')fail(403,'Owner only');
+   const key=crypto.createHmac('sha256',process.env.TELEGRAM_BOT_TOKEN).update('afglion-adsgram-callback-v1').digest('hex');
+   return {ok:true,url:'https://velora-members-club.vercel.app/api/index?action=adsgramCallback&userId=[userId]&key='+key};
+  }
   if(type==='broadcastCreate'){
    if(role!=='owner')fail(403,'Only owners can start broadcasts');
    const message=secureString(body.message,1600);
