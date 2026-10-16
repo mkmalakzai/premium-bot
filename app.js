@@ -265,38 +265,68 @@ function downloadBrandPng(kind){
  img.src=asset;
 }
 
-function availableMethods(forDeposit){return (data().settings.paymentMethods||[{id:'manual',name:'Manual Transfer',number:data().settings.depositNumber||'',enabled:true}]).filter(function(m){return m.enabled!==false&&(!forDeposit||!!m.number);});}
-function selectedMethod(){var el=document.getElementById('money-method');return availableMethods(!!(document.getElementById('money-form')&&document.getElementById('money-form').dataset.type==='deposit')).find(function(m){return m.id===(el&&el.value);})||null;}
-function showMethodDestination(){var m=selectedMethod(),target=document.getElementById('payment-dest-number'),copy=document.getElementById('payment-copy'),submit=document.getElementById('money-submit');
- if(!target)return;
- target.textContent=m&&m.number?m.number:'This payment method has no receiving number yet';
+function availableMethods(forDeposit,curr){
+ var active=data().settings.currencyMigrationStatus==='active';
+ return (data().settings.paymentMethods||[{id:'manual',name:'Manual Transfer',number:data().settings.depositNumber||'',enabled:true,currency:'AFN'}]).filter(function(m){
+  return m.enabled!==false&&(!forDeposit||!!m.number)&&(!active||(m.currency||'AFN')===(curr||'AFN'));
+ });
+}
+function selectedMethod(){
+ var form=document.getElementById('money-form'),el=document.getElementById('money-method'),cur=document.getElementById('money-currency');
+ return availableMethods(!!(form&&form.dataset.type==='deposit'),cur&&cur.value||'AFN').find(function(m){return m.id===(el&&el.value);})||null;
+}
+function showMethodDestination(){
+ var m=selectedMethod(),target=document.getElementById('payment-dest-number'),copy=document.getElementById('payment-copy'),submit=document.getElementById('money-submit'),form=document.getElementById('money-form');
+ if(!form)return;
+ if(target)target.textContent=m&&m.number?m.number:'No receiving account configured for this currency';
  if(copy)copy.disabled=!(m&&m.number);
  if(submit)submit.disabled=!(m&&m.number);
+ var cur=document.getElementById('money-currency'),unitName=cur&&cur.value||'AFN',rate=Number(data().settings.usdtAfnRate||65),isActive=data().settings.currencyMigrationStatus==='active',min=Number(form.dataset.minimum||1);
+ var minOriginal=isActive&&unitName==='AFN'?Math.ceil(min*rate*100-0.00001)/100:min;
+ var amount=document.getElementById('money-amount'),label=document.getElementById('money-amount-label');
+ if(amount){amount.min=minOriginal;amount.step=unitName==='AFN'?'0.01':'0.0001';amount.placeholder='Enter '+unitName+' amount';}
+ if(label)label.textContent='Amount ('+unitName+') · Minimum '+n(minOriginal)+' '+unitName;
+ var preview=document.getElementById('money-conversion'),value=amount&&Number(amount.value)||0;
+ if(preview)preview.textContent=isActive&&value>0?'Estimated wallet amount: '+n(unitName==='AFN'?Math.round(value/rate*10000)/10000:value)+' USDT · locked on submission at '+n(rate)+' AFN/USDT':isActive?'1 USDT = '+n(rate)+' AFN · wallet balance is in USDT':'';
+}
+function updateMoneyMethodOptions(){
+ var form=document.getElementById('money-form'),selector=document.getElementById('money-method'),cur=document.getElementById('money-currency');
+ if(!form||!selector)return;
+ var items=availableMethods(form.dataset.type==='deposit',cur&&cur.value||'AFN');
+ selector.innerHTML=items.length?items.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join(''):'<option value="">No payment method for this currency</option>';
+ showMethodDestination();
 }
 function paymentModal(type){
- var st=data().settings,deposit=type==='deposit',methods=availableMethods(deposit),
- contact=st.depositContact||'Mk_Malakzai',ready=methods.some(function(m){return !deposit||m.number;});
- modal(deposit?'Deposit AFN':'Withdraw AFN',
+ var st=data().settings,deposit=type==='deposit',active=st.currencyMigrationStatus==='active',initial='AFN',
+ methods=availableMethods(deposit,initial),contact=st.depositContact||'Mk_Malakzai',min=Number(deposit?st.minDeposit:st.minWithdraw),
+ initialMin=active?Math.ceil(min*Number(st.usdtAfnRate||65)*100-0.00001)/100:min,ready=methods.some(function(m){return !!m.number;});
+ if(st.currencyMigrationStatus==='migrating')return toast('Currency conversion is in progress. Try again after it finishes.');
+ modal(deposit?'Deposit':'Withdraw',
  '<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
- '<form id="money-form" data-type="'+type+'">'+
+ '<form id="money-form" data-type="'+type+'" data-minimum="'+min+'">'+
+ (active?'<label class="form-label">Payment currency</label><select class="field" id="money-currency"><option value="AFN">AFN · Afghan afghani</option><option value="USDT">USDT · Tether</option></select><p id="money-conversion" class="muted-note">1 USDT = '+n(st.usdtAfnRate||65)+' AFN. Your main wallet is in USDT.</p>':'')+
  '<label class="form-label">'+(deposit?'How will you send your deposit?':'Where should we send your withdrawal?')+'</label>'+
  '<select class="field" id="money-method" required>'+
  (methods.length?methods.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join(''):'<option value="">Payment method unavailable</option>')+'</select>'+
- (deposit?'<div class="deposit-destination"><small>Send your AFN payment to this receiving number</small><strong id="payment-dest-number">'+esc(methods[0]&&methods[0].number||'No receiving number is available')+'</strong>'+
- '<button type="button" class="btn btn-outline btn-small" id="payment-copy" data-action="copy-deposit" '+(!ready?'disabled':'')+'>'+icon('copy')+' Copy number</button></div>'+
- '<div class="deposit-steps"><b>Send the receipt screenshot</b><p>After sending your AFN payment, send the transfer screenshot to our deposit administrator.</p>'+
- '<button type="button" class="btn btn-primary btn-block" data-action="open-link" data-url="https://t.me/'+esc(contact)+'">'+icon('external')+' Send screenshot to @'+esc(contact)+'</button></div>':'')+
- '<label class="form-label">Amount (AFN) · Minimum '+n(deposit?st.minDeposit:st.minWithdraw)+'</label>'+
- '<input class="field" id="money-amount" type="number" min="'+(deposit?st.minDeposit:st.minWithdraw)+'" max="1000000" step="1" placeholder="Enter whole AFN amount" required>'+
+ (deposit?'<div class="deposit-destination"><small>Send your selected currency to this account/address</small><strong id="payment-dest-number">'+esc(methods[0]&&methods[0].number||'No receiving account is available')+'</strong>'+
+ '<button type="button" class="btn btn-outline btn-small" id="payment-copy" data-action="copy-deposit" '+(!ready?'disabled':'')+'>'+icon('copy')+' Copy address / account</button></div>'+
+ '<div class="deposit-steps"><b>Send the receipt screenshot</b><p>Only send the selected currency via the displayed payment method. After paying, send proof to our deposit administrator.</p>'+
+ '<button type="button" class="btn btn-primary btn-block" data-action="open-link" data-url="https://t.me/'+esc(contact)+'">'+icon('external')+' Send receipt to @'+esc(contact)+'</button></div>':'')+
+ '<label id="money-amount-label" class="form-label">Amount (AFN) · Minimum '+n(initialMin)+' AFN</label>'+
+ '<input class="field" id="money-amount" type="number" min="'+initialMin+'" max="1000000" step="0.01" placeholder="Enter AFN amount" required>'+
  (deposit?
- '<label class="form-label">Deposit transfer reference / sender name</label><textarea id="deposit-reference" class="field" minlength="5" maxlength="300" placeholder="Enter your deposit receipt number and sender name" required></textarea>':
- '<label class="form-label">YOUR withdrawal receiving number / account</label><input id="withdraw-recipient" class="field" type="text" minlength="5" maxlength="300" placeholder="Enter your number or account to receive payment" autocomplete="off" required>'+
- '<div class="alert">'+icon('info')+' Do not enter any deposit transaction reference. Enter only the recipient number or account where you will receive your withdrawal.</div>')+
- '<div class="alert">'+(deposit?'Deposit is credited after the administrator verifies your transfer and screenshot.':'Your withdrawal is reserved during manual review. Check your payout number carefully.')+'</div>'+
+ '<label class="form-label">Deposit transfer reference / sender name</label><textarea id="deposit-reference" class="field" minlength="5" maxlength="300" placeholder="Enter payment reference or wallet transaction hash" required></textarea>':
+ '<label class="form-label">Withdrawal destination address / account</label><input id="withdraw-recipient" class="field" type="text" minlength="5" maxlength="300" placeholder="Enter your receiving phone, account or USDT address" autocomplete="off" required>'+
+ '<div class="alert">'+icon('info')+' Enter your receiving destination only. Never enter a deposit receipt as a withdrawal account.</div>')+
+ '<div class="alert">'+(deposit?'Funds are credited in '+(active?'USDT':'AFN')+' only after manual verification.':'Your '+(active?'USDT':'AFN')+' wallet reserves the quoted value until the payout is approved or cancelled.')+'</div>'+
  '<button class="btn btn-primary btn-block" id="money-submit" style="margin-top:14px" '+(!ready?'disabled':'')+'>Submit '+(deposit?'deposit':'withdrawal')+' request</button></form>');
 }
-
-document.addEventListener('change',function(e){if(e.target&&e.target.id==='money-method')showMethodDestination();});
+document.addEventListener('change',function(e){
+ if(!e.target)return;
+ if(e.target.id==='money-currency')updateMoneyMethodOptions();
+ if(e.target.id==='money-method'||e.target.id==='money-amount')showMethodDestination();
+});
+document.addEventListener('input',function(e){if(e.target&&e.target.id==='money-amount')showMethodDestination();});
 
 document.addEventListener('submit',async function(e){if(e.target.id==='staff-form'){e.preventDefault();if(!confirm('Update role for this Telegram user?'))return;await adminAction('setRole',{userId:document.getElementById('staff-id').value.trim(),role:document.getElementById('staff-role').value});return;}
 if(e.target.id==='method-form'){e.preventDefault();await adminAction('savePaymentMethod',{methodId:e.target.dataset.id,method:{name:document.getElementById('method-name').value.trim(),number:document.getElementById('method-number').value.trim(),enabled:document.getElementById('method-enabled').value==='yes'}});return;}
