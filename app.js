@@ -198,6 +198,9 @@ case 'admin-money-approve':if(confirm('Approve this manual payment request? Veri
 case 'admin-money-reject':if(confirm('Reject this payment request?'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:false});break;
 case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
 case 'admin-test-notice':await adminAction('testNotification',{});break;
+case 'currency-rate-save':await adminAction('saveExchangeRate',{rate:getNum('currency-rate')});break;
+case 'currency-begin':if(confirm('Convert all existing AFN balances to USDT at the saved rate? This changes live member balances. Export a Firebase backup first.')){await adminAction('beginCurrencyMigration',{});await runCurrencyMigration();}break;
+case 'currency-continue':await runCurrencyMigration();break;
 case 'ads-save':await adminAction('saveAdsSettings',{adsEnabled:document.getElementById('ads-enabled').checked,adsReward:Number(document.getElementById('ads-reward').value),adsDailyLimit:Number(document.getElementById('ads-limit').value)});break;
 case 'ads-callback':try{var linkResult=await api('adminAction',{type:'adsCallbackUrl'});modal('AdsGram Reward URL','<p class="body-sub">Paste this confidential URL into AdsGram Block 52925 Reward URL. Do not share it publicly.</p><textarea class="field" rows="5" readonly>'+esc(linkResult.url)+'</textarea>');}catch(e){toast(e.message);}break;
 
@@ -303,7 +306,7 @@ async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegra
 
 var adminNavigation=[
  {group:'Main',items:[['overview','Dashboard','home'],['users','Members','users']]},
- {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['notices','Channel notifications','bell'],['broadcast','Broadcast','bell'],['ads','AdsGram','gift']]},
+ {group:'Money',items:[['money','Transactions','wallet'],['methods','Payment methods','settings'],['currency','USDT & conversion','wallet'],['notices','Channel notifications','bell'],['broadcast','Broadcast','bell'],['ads','AdsGram','gift']]},
  {group:'Subscriptions',items:[['packages','VIP packages','crown']]},
  {group:'Configuration',items:[['settings','Settings','settings'],['branding','Official brand kit','spark'],['staff','Staff & owners','shield']]}
 ];
@@ -314,7 +317,7 @@ function adminLabel(key){
 function adminTabs(){
  var onlyOwner=state.admin&&state.admin.callerRole==='owner';
  var content=adminNavigation.map(function(section){
- var buttons=section.items.filter(function(i){return i[0]!=='staff'||onlyOwner;}).map(function(i){
+ var buttons=section.items.filter(function(i){return !['staff','currency'].includes(i[0])||onlyOwner;}).map(function(i){
  return '<button class="admin-side-link '+(state.adminTab===i[0]?'active':'')+'" data-action="admin-tab" data-tab="'+i[0]+'">'+icon(i[2])+'<span>'+esc(i[1])+'</span>'+(state.adminTab===i[0]?'<span class="admin-link-current"></span>':'')+'</button>';}).join('');
  return '<div class="admin-nav-group"><div class="admin-nav-group-title">'+esc(section.group)+'</div>'+buttons+'</div>';
  }).join('');
@@ -353,6 +356,17 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<div id="admin-users">'+adminUserRows(a.users)+'</div>';
  }
 
+ if(tab==='currency'){
+ var cfg=a.settings||{},status=cfg.currencyMigrationStatus||'pending',rate=Number(cfg.usdtAfnRate||65);
+ html+='<div class="admin-callout"><b>AFGLION USDT ledger</b><p>One USDT = '+n(rate)+' AFN. Only the owner can change the exchange rate or run the one-time conversion.</p></div>'+
+ '<div class="panel"><label class="form-label">Exchange rate · AFN per 1 USDT</label><input class="field" type="number" id="currency-rate" step="0.0001" min="1" max="1000" value="'+rate+'" '+(status==='migrating'?'disabled':'')+'>'+
+ '<button class="btn btn-outline btn-block" data-action="currency-rate-save" '+(status==='migrating'?'disabled':'')+'>Save exchange rate</button></div>'+
+ '<div class="panel"><div class="daily-title">Migration status: '+esc(status.toUpperCase())+'</div><p class="body-sub">Legacy AFN balances, wallet statistics, ad earnings and active VIP snapshots convert once at the locked starting rate. A separate Firestore backup is written for every converted user.</p>'+
+ '<p class="body-sub">Converted members: '+n(cfg.currencyMigrationCount||0)+' · Locked rate: '+n(cfg.migrationRate||rate)+' AFN/USDT</p>'+
+ (status==='pending'?'<div class="alert">Before starting: export a Firebase backup. During migration all monetary actions and new registrations are paused. Old VIP package listings will be archived; create new USDT packages afterward.</div><button class="btn btn-primary btn-block" data-action="currency-begin">Begin one-time conversion</button>':
+ status==='migrating'?'<div class="alert">Conversion is in progress. Complete every batch to unlock transfers.</div><button class="btn btn-primary btn-block" data-action="currency-continue">Continue currency conversion</button>':
+ '<div class="alert">All available member accounts converted. USDT wallet is active; configure new USDT payment methods and VIP plans.</div>')+'</div>';
+ }
  if(tab==='money'){
  html+=(a.moneyRequests||[]).length?a.moneyRequests.map(function(req){
  return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'↓ Deposit':'↑ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div>'+
@@ -551,6 +565,7 @@ async function advanceBroadcast(){
  finally{broadcastWorking=false;}
 }
 
+async function runCurrencyMigration(){if(state.loading)return;state.loading=true;try{var outcome;for(var i=0;i<50;i++){outcome=await api('adminAction',{type:'currencyMigrationBatch'});if(outcome.status==='active')break;}state.admin=await api('adminData');await refresh();state.page='admin';state.adminTab='currency';renderAdmin();toast(outcome.status==='active'?'USDT migration completed. Create new VIP packages.':'Batch saved. Tap Continue currency conversion to finish.');}catch(e){toast('Conversion paused safely: '+e.message+'. Use Continue to retry.');try{state.admin=await api('adminData');renderAdmin();}catch(ignore){}}finally{state.loading=false;}}
 async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{var outcome=await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast(outcome&&outcome.notificationSent===false?'Approved, but channel post failed — open Notifications':outcome&&outcome.sent===false?'Notification failed. Check channel permissions.':'Changes saved');}catch(e){toast(e.message);}finally{state.loading=false;}}
 
 init();
