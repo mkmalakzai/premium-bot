@@ -48,6 +48,10 @@ async function roleOf(id,store){
 }
 function roleRank(role){return role==='owner'?2:role==='admin'?1:0;}
 function numericId(x){return /^\d{3,20}$/.test(String(x||''));}
+function round4(x){return Math.round((Number(x)+Number.EPSILON)*10000)/10000;}
+function validMoney(x,min,max){return typeof x==='number'&&Number.isFinite(x)&&x>=min&&x<=max&&Math.abs(x-round4(x))<0.00000001;}
+function requireCurrencyReady(config,user){if(config.currencyMigrationStatus==='migrating')fail(503,'USDT migration is underway. Transactions are temporarily paused.');if(config.currencyMigrationStatus==='active'&&user&&user.currencyVersion!==2)fail(503,'Currency conversion is pending for this account');}
+function requestUsdt(item,config){return item.currency==='USDT'?Number(item.amount):round4(Number(item.amount)/Number(config.migrationRate||65));}
 function whole(x,min,max){return typeof x==='number'&&Number.isSafeInteger(x)&&x>=min&&x<=max;}
 function checkAmount(x,min,max){if(!whole(x,min,max))fail(400,'Invalid AFN amount');return x;}
 function settings(s){
@@ -200,7 +204,7 @@ async function route(req){
   const expected=crypto.createHmac('sha256',process.env.TELEGRAM_BOT_TOKEN).update('afglion-adsgram-callback-v1').digest('hex');
   if(!/^\d{3,20}$/.test(userId)||provided.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(provided),Buffer.from(expected)))fail(403,'Unauthorized callback');
   const ref=users.doc(userId),now=Date.now(),ss=settings(await settingRef.get());
-  if(!ss.adsEnabled||ss.adsBlockId!=='52925'||!ss.adsReward)return {ok:true,credited:false};
+  if(ss.currencyMigrationStatus==='migrating'||!ss.adsEnabled||ss.adsBlockId!=='52925'||!ss.adsReward)return {ok:true,credited:false};
   return await store.runTransaction(async tx=>{
    const snap=await tx.get(ref);
    if(!snap.exists||snap.data().banned)return {ok:true,credited:false};
@@ -225,6 +229,7 @@ async function route(req){
   await store.runTransaction(async tx=>{
    const existing=await tx.get(userRef);
    if(existing.exists)return;
+   if(st.currencyMigrationStatus==='migrating')fail(503,'Currency migration in progress. Please try again later.');
    const parentRef=inviter?users.doc(inviter):null;
    const parent=parentRef?await tx.get(parentRef):null;
    const eligible=parent&&parent.exists&&!parent.data().banned;
@@ -235,7 +240,7 @@ async function route(req){
     photoUrl:typeof who.photo_url==='string'&&who.photo_url.startsWith('https://')?who.photo_url.slice(0,800):'',
     referrerId:eligible?inviter:null, balance:0, totalEarned:0,totalDeposited:0,totalWithdrawn:0,pendingWithdraw:0,
     referralCount:0,referralEarned:0,vipTier:'free',vipUntil:0,vipActivatedAt:0,
-    vipDaysClaimed:0,vipLastClaimSlot:0,vipPlanSnapshot:null,lastClaimAt:0,claimStreak:0,joinedAt:now,banned:false
+    vipDaysClaimed:0,vipLastClaimSlot:0,vipPlanSnapshot:null,lastClaimAt:0,claimStreak:0,joinedAt:now,banned:false,currencyVersion:st.currencyMigrationStatus==='active'?2:1
    });
    if(eligible){
     tx.update(parentRef,{referralCount:admin.firestore.FieldValue.increment(1)});
@@ -248,6 +253,7 @@ async function route(req){
  }
  const {id,ref,role}=await signedIn(req,store);
  const currentSettings=settings(await settingRef.get());
+ if(currentSettings.currencyMigrationStatus==='migrating'&&!['me','adminData','adminAction','joinStatus','adStatus','profileUpdate'].includes(action))fail(503,'USDT conversion in progress; money actions are paused.');
  const membership=await memberStatus(id,currentSettings,role);
  if(action==='joinStatus')return {joined:membership.joined,joinRequired:!membership.joined,joinUrl:membership.url,joinIssue:membership.issue};
  if(!membership.joined){
@@ -437,6 +443,7 @@ async function route(req){
  if(action==='adminAction'){
   if(req.method!=='POST')fail(405,'POST required');
   const type=String(body.type||''),now=Date.now();
+  if(currentSettings.currencyMigrationStatus==='migrating'&&type!=='currencyMigrationBatch')fail(503,'Currency migration in progress. Finish all batches before editing settings or accounts.');
   if(type==='saveSettings'){
    const announcement=secureString(body.announcement,350),botUsername=botContact(body.botUsername||'Afglionbot');
    const dailyBonus=checkAmount(body.dailyBonus,0,1000),referralPercent=checkAmount(body.referralPercent,0,50);
@@ -540,6 +547,80 @@ async function route(req){
   }
   // VIP purchases are automatically activated in one Firestore transaction; no manual VIP approvals.
 
+  if(type==='beginCurrencyMigration'){
+   if(role!=='owner')fail(403,'Owner only');
+   return await store.runTransaction(async tx=>{
+    const old=await tx.get(settingRef),cfg=settings(old);
+    if(cfg.currencyMigrationStatus!=='pending')fail(409,'Currency migration was already started');
+    const rate=Number(cfg.usdtAfnRate);
+    if(!Number.isFinite(rate)||rate<1||rate>1000)fail(400,'Set a valid AFN per USDT rate');
+    tx.set(settingRef,{currencyMigrationStatus:'migrating',migrationRate:rate,currencyMigrationCursor:'',currencyMigrationCount:0,currencyMigrationStartedAt:Date.now()},{merge:true});
+    tx.set(store.collection(C.audits).doc(),{actor:id,kind:'usdt_migration_start',rate,at:Date.now()});
+    return {ok:true,status:'migrating',rate};
+   });
+  }
+  if(type==='currencyMigrationBatch'){
+   if(role!=='owner')fail(403,'Owner only');
+   const cfg=settings(await settingRef.get());
+   if(cfg.currencyMigrationStatus==='active')return {ok:true,status:'active',migrated:cfg.currencyMigrationCount||0};
+   if(cfg.currencyMigrationStatus!=='migrating')fail(409,'Start currency migration first');
+   const rate=Number(cfg.migrationRate),cursor=String(cfg.currencyMigrationCursor||'');
+   let query=users.orderBy(admin.firestore.FieldPath.documentId()).limit(12);
+   if(cursor)query=query.startAfter(cursor);
+   const page=await query.get();
+   let processed=0,last=cursor;
+   for(const userDoc of page.docs){
+    const userRef=userDoc.ref,backup=store.collection('veloraCurrencyBackups').doc(userDoc.id);
+    await store.runTransaction(async tx=>{
+     const [u,b,settingsSnap]=await Promise.all([tx.get(userRef),tx.get(backup),tx.get(settingRef)]);
+     if(!u.exists)return;
+     const c=settings(settingsSnap);
+     if(c.currencyMigrationStatus!=='migrating'||c.migrationRate!==rate)fail(409,'Migration settings changed');
+     const previous=u.data();
+     if(previous.currencyVersion===2)return;
+     if(b.exists)fail(409,'Currency backup exists for unconverted user. Manual review required.');
+     const moneyFields=['balance','totalEarned','totalDeposited','totalWithdrawn','pendingWithdraw','referralEarned','earningsBalance','earningsTotal','earningsClaimed'];
+     const update={currencyVersion:2,currencyConvertedAt:Date.now(),currencyConversionRate:rate};
+     for(const field of moneyFields){
+      if(previous[field]!==undefined){
+       const old=Number(previous[field]);
+       if(!Number.isFinite(old))fail(409,'Invalid legacy money field: '+field);
+       update[field]=round4(old/rate);
+      }
+     }
+     if(previous.vipPlanSnapshot){
+      const plan=previous.vipPlanSnapshot;
+      update.vipPlanSnapshot={...plan,price:round4(Number(plan.price||0)/rate),dailyReward:round4(Number(plan.dailyReward||0)/rate)};
+     }
+     tx.set(backup,{userId:userDoc.id,rate,migratedAt:Date.now(),legacy:previous});
+     tx.update(userRef,update);
+     tx.set(userRef.collection('activity').doc(),{label:'AFN to USDT account conversion at '+rate+' AFN/USDT',amount:0,currency:'USDT',at:Date.now()});
+    });
+    last=userDoc.id;processed++;
+   }
+   if(processed){
+    await store.runTransaction(async tx=>{
+     const snap=await tx.get(settingRef),c=settings(snap);
+     if(c.currencyMigrationStatus!=='migrating'||c.currencyMigrationCursor!==cursor)fail(409,'Migration cursor changed. Retry.');
+     tx.update(settingRef,{currencyMigrationCursor:last,currencyMigrationCount:(c.currencyMigrationCount||0)+processed});
+    });
+   }
+   if(page.size===12)return {ok:true,status:'migrating',migrated:(cfg.currencyMigrationCount||0)+processed};
+   // Complete only after no more users remain. New signups and monetary writes are blocked.
+   await store.runTransaction(async tx=>{
+    const snap=await tx.get(settingRef),c=settings(snap);
+    if(c.currencyMigrationStatus!=='migrating'||c.currencyMigrationCursor!==last)fail(409,'Migration changed. Retry.');
+    tx.update(settingRef,{
+     currencyMigrationStatus:'active',currencyMigrationFinishedAt:Date.now(),
+     vipPackages:{},legacyVipPackages:c.vipPackages,
+     dailyBonus:round4(c.dailyBonus/rate),adsReward:round4(c.adsReward/rate),
+     adsClaimMinimum:round4(10/rate),
+     minDeposit:round4(c.minDeposit/rate),minWithdraw:round4(c.minWithdraw/rate)
+    });
+    tx.set(store.collection(C.audits).doc(),{actor:id,kind:'usdt_migration_complete',rate,count:c.currencyMigrationCount||0,at:Date.now()});
+   });
+   return {ok:true,status:'active',migrated:(cfg.currencyMigrationCount||0)+processed};
+  }
   if(type==='saveExchangeRate'){
    if(role!=='owner')fail(403,'Owner only');
    const rate=Number(body.rate);
