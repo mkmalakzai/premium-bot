@@ -293,7 +293,7 @@ function updateMoneyMethodOptions(){
  var form=document.getElementById('money-form'),selector=document.getElementById('money-method'),cur=document.getElementById('money-currency');
  if(!form||!selector)return;
  var items=availableMethods(form.dataset.type==='deposit',cur&&cur.value||'AFN');
- selector.innerHTML=items.length?items.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join(''):'<option value="">No payment method for this currency</option>';
+ selector.innerHTML=items.length?items.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+(m.currency==='USDT'?' · '+esc(m.network||'?'):'')+'</option>';}).join(''):'<option value="">No payment method for this currency</option>';
  showMethodDestination();
 }
 function paymentModal(type){
@@ -305,9 +305,9 @@ function paymentModal(type){
  '<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
  '<form id="money-form" data-type="'+type+'" data-minimum="'+min+'">'+
  (active?'<label class="form-label">Payment currency</label><select class="field" id="money-currency"><option value="AFN">AFN · Afghan afghani</option><option value="USDT">USDT · Tether</option></select><p id="money-conversion" class="muted-note">1 USDT = '+n(st.usdtAfnRate||65)+' AFN. Your main wallet is in USDT.</p>':'')+
- '<label class="form-label">'+(deposit?'How will you send your deposit?':'Where should we send your withdrawal?')+'</label>'+
+ '<p class="muted-note">For USDT, always use the exact network shown beside your chosen payment method. Blockchain deposits and payouts are manually verified.</p><label class="form-label">'+(deposit?'How will you send your deposit?':'Where should we send your withdrawal?')+'</label>'+
  '<select class="field" id="money-method" required>'+
- (methods.length?methods.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join(''):'<option value="">Payment method unavailable</option>')+'</select>'+
+ (methods.length?methods.map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+(m.currency==='USDT'?' · '+esc(m.network||'?'):'')+'</option>';}).join(''):'<option value="">Payment method unavailable</option>')+'</select>'+
  (deposit?'<div class="deposit-destination"><small>Send your selected currency to this account/address</small><strong id="payment-dest-number">'+esc(methods[0]&&methods[0].number||'No receiving account is available')+'</strong>'+
  '<button type="button" class="btn btn-outline btn-small" id="payment-copy" data-action="copy-deposit" '+(!ready?'disabled':'')+'>'+icon('copy')+' Copy address / account</button></div>'+
  '<div class="deposit-steps"><b>Send the receipt screenshot</b><p>Only send the selected currency via the displayed payment method. After paying, send proof to our deposit administrator.</p>'+
@@ -435,7 +435,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  html+='<div class="admin-callout">Add receiving methods such as Hawala, bank or mobile wallet. The chosen number appears to customers on Deposit with a Copy button.</div>'+
  '<button class="btn btn-primary btn-block" data-action="admin-add-method">'+icon('wallet')+' Add payment method</button>'+
  (methods.length?methods.map(function(m){
- return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(m.name)+' · '+esc(m.currency||'AFN')+'</b><small>'+esc(m.number||'No receiving number')+'</small></div><span class="badge '+(m.enabled===false?'red':'green')+'">'+(m.enabled===false?'HIDDEN':'ACTIVE')+'</span></div>'+
+ return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(m.name)+' · '+esc(m.currency||'AFN')+(m.currency==='USDT'?' / '+esc(m.network||'?'):'')+'</b><small>'+esc(m.number||'No receiving number')+'</small></div><span class="badge '+(m.enabled===false?'red':'green')+'">'+(m.enabled===false?'HIDDEN':'ACTIVE')+'</span></div>'+
  '<div class="package-manage-actions"><button class="btn btn-outline btn-small" data-action="admin-edit-method" data-id="'+esc(m.id)+'">'+icon('edit')+' Edit</button><button class="btn btn-ghost btn-small" data-action="admin-delete-method" data-id="'+esc(m.id)+'">Delete</button></div></div>';
  }).join(''):empty('wallet','No methods available','Add your first receiving method above.'));
  }
