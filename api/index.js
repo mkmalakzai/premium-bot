@@ -767,8 +767,9 @@ async function route(req){
     const item=r.data(),target=users.doc(item.userId);
     const [u,current]=await Promise.all([tx.get(target),tx.get(settingRef)]);
     if(!u.exists)fail(404,'Account not found');
-    const amount=item.amount;
-    if(!whole(amount,1,1000000)||!['deposit','withdraw'].includes(item.type))fail(400,'Invalid transaction record');
+    const rules=settings(current);requireCurrencyReady(rules,u.data());
+    const amount=rules.currencyMigrationStatus==='active'?requestUsdt(item,rules):item.amount;
+    if(!validMoney(amount,0.0001,1000000)||!['deposit','withdraw'].includes(item.type))fail(400,'Invalid transaction record');
     const update={};
     if(item.type==='deposit'&&approve){
      update.balance=admin.firestore.FieldValue.increment(amount);
@@ -781,12 +782,12 @@ async function route(req){
     }
     tx.update(target,update);
     tx.update(moneyRef,{status:approve?'approved':'rejected',reviewedAt:now,reviewedBy:id});
-    tx.set(target.collection('activity').doc(),{label:item.type+' '+(approve?'approved':'rejected'),amount:item.type==='deposit'&&approve?amount:item.type==='withdraw'&&!approve?amount:0,at:now});
-    const rules=settings(current),channel=rules.notificationChannel;
+    tx.set(target.collection('activity').doc(),{label:item.type+' '+(approve?'approved':'rejected'),amount:item.type==='deposit'&&approve?amount:item.type==='withdraw'&&!approve?amount:0,currency:rules.currencyMigrationStatus==='active'?'USDT':'AFN',at:now});
+    const channel=rules.notificationChannel;
     const notify=approve&&rules.notifyApprovals&&!!channel;
     if(notify){
      const noticeRef=store.collection(C.notices).doc(requestId);
-     tx.set(noticeRef,{type:item.type,amount,userId:item.userId,channel,status:'pending',createdAt:now,attempts:0,reviewedBy:id,lastError:''});
+     tx.set(noticeRef,{type:item.type,amount,currency:rules.currencyMigrationStatus==='active'?'USDT':'AFN',userId:item.userId,channel,status:'pending',createdAt:now,attempts:0,reviewedBy:id,lastError:''});
     }
     return {ok:true,notificationQueued:notify};
    });
