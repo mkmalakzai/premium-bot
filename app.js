@@ -29,7 +29,7 @@ var icons = {
 };
 function icon(n){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[n]||icons.spark)+'</svg>';}
 function esc(s){return String(s == null ? '' : s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-function n(v){return Number(v||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
+function n(v){return Number(v||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:4});}
 function fmtDate(ms){return ms ? new Date(ms).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';}
 function avatar(user,cls){var name=(user.name||user.firstName||'G').trim();return '<div class="'+(cls||'user-avatar')+'">'+(user.photoUrl ? '<img src="'+esc(user.photoUrl)+'" alt="">' : esc(name.charAt(0).toUpperCase()))+'</div>';}
 var state={theme:(function(){try{return localStorage.getItem('afglion_theme')==='light'?'light':'dark';}catch(_){return 'dark';}})(),adminNavOpen:false,gate:null,page:'home',data:null,token:sessionStorage.getItem('afglion_session')||'',demo:!tg || !tg.initData,loading:false,admin:null,adminTab:'overview',configMissing:false};
@@ -83,7 +83,9 @@ function nav(){return '<nav class="bottom-nav" aria-label="Main navigation">'+[
  ['home','home','Home'],['vip','crown','VIP'],['referral','users','Referral'],['earn','gift','Earn'],['profile','profile','Profile']
 ].map(function(v){return '<button class="nav-item '+(state.page===v[0]?'active':'')+'" data-page="'+v[0]+'" aria-label="'+v[2]+'">'+icon(v[1])+'<span>'+v[2]+'</span></button>';}).join('')+'</nav>';}
 
-function currency(v){return n(v)+' AFN';}
+function unit(){return data()&&data().settings&&data().settings.currencyMigrationStatus==='active'?'USDT':'AFN';}
+function currency(v){return n(v)+' '+unit();}
+function originalPayment(t){return n(t.originalAmount===undefined?t.amount:t.originalAmount)+' '+(t.originalCurrency||t.currency||'AFN');}
 function vipName(u){u=u||user();if(!u.vipTier||u.vipTier==='free')return 'Free';var p=u.vipPlanSnapshot||((data().settings.vipPackages||data().settings.plans||{})[u.vipTier]);if(p&&p.name)return p.name;return /^vip_/.test(u.vipTier)?'VIP Member':u.vipTier.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
 function setTheme(){document.documentElement.setAttribute('data-theme',state.theme);try{if(tg){tg.setHeaderColor(state.theme==='light'?'#f2f4f8':'#090c12');tg.setBackgroundColor(state.theme==='light'?'#f2f4f8':'#090c12');}}catch(e){}}
 function toggleTheme(){state.theme=state.theme==='dark'?'light':'dark';try{localStorage.setItem('afglion_theme',state.theme);}catch(e){}setTheme();render();toast(state.theme==='light'?'Light mode on':'Dark mode on');}
@@ -114,7 +116,7 @@ function vip(){var u=user(),st=data().settings,plans=st.vipPackages||st.plans||{
 section('Available VIP packages')+'<div class="tier-list">'+Object.keys(plans).filter(function(id){return plans[id].enabled!==false;}).map(function(tier){var v=plans[tier],mine=u.vipTier===tier&&u.vipUntil>Date.now(),otherActive=u.vipTier!=='free'&&u.vipUntil>Date.now();
 return '<div class="tier '+(mine?'premium':'')+'"><div class="tier-top"><div class="tier-title"><span class="action-icon">'+icon('crown')+'</span><span>'+esc(v.name||tier.toUpperCase())+'</span></div><div class="tier-price">'+currency(v.price)+'<small>'+n(v.days)+'-day membership</small></div></div><div class="plan-big"><b>'+currency(v.dailyReward)+'</b><span>per eligible day</span></div><div class="tier-benefits"><div class="tier-feature">'+icon('check')+' '+n(v.days)+'-day schedule</div><div class="tier-feature">'+icon('check')+' Total scheduled: '+currency((v.dailyReward||0)*(v.days||0))+'</div><div class="tier-feature">'+icon('check')+' Instant VIP activation after wallet payment</div></div><button class="btn '+(mine?'btn-ghost':'btn-primary')+' btn-block" '+(otherActive?'disabled':'data-action="vip-request" data-tier="'+esc(tier)+'"')+'>'+(mine?'Current package':otherActive?'Current VIP still active':'Activate '+esc(v.name))+'</button></div>';}).join('')+'</div>'+
 '<div class="alert">'+icon('info')+' VIP rewards are subject to an eligibility schedule. Returns are not guaranteed.</div>'+footer()+'</div>';}
-function wallet(){var u=user(),s=data().settings,items=data().transactions||[];return '<div class="view">'+goldTitle('Your wallet.','Track available AFN funds, submitted payments and payouts.')+hero()+
+function wallet(){var u=user(),s=data().settings,items=data().transactions||[];return '<div class="view">'+goldTitle('Your wallet.','Track available '+unit()+' funds, submitted payments and payouts.')+hero()+
 '<div class="wallet-actions"><button class="wallet-action" data-action="deposit"><span>'+icon('arrow')+'</span><b>Deposit</b><small>Manual approval</small></button><button class="wallet-action" data-action="withdraw"><span>'+icon('wallet')+'</span><b>Withdraw</b><small>Manual payout</small></button><button class="wallet-action" data-action="refresh"><span>'+icon('refresh')+'</span><b>Refresh</b><small>Get latest status</small></button></div>'+
 '<div class="stats-row"><div class="stat-small"><div class="label">Deposited</div><div class="value">'+n(u.totalDeposited)+'</div></div><div class="stat-small"><div class="label">Withdrawn</div><div class="value">'+n(u.totalWithdrawn)+'</div></div><div class="stat-small"><div class="label">On hold</div><div class="value gold">'+n(u.pendingWithdraw)+'</div></div></div>'+
 section('Manual payment history')+(items.length?'<div class="transaction-list">'+items.map(function(t){return '<div class="transaction-row"><div class="transaction-icon">'+icon(t.type==='deposit'?'arrow':'wallet')+'</div><div class="transaction-main"><strong>'+esc(t.type==='deposit'?'Deposit':'Withdrawal')+' · '+currency(t.amount)+'</strong><small>'+esc(t.method)+' · '+fmtDate(t.createdAt)+'</small><small>'+esc(t.status||'pending')+'</small></div><span class="badge '+(t.status==='rejected'?'red':'')+'">'+esc(t.status||'pending')+'</span>'+(t.type==='withdraw'&&t.status==='pending'?'<button class="mini-cancel" data-action="cancel-withdraw" data-id="'+esc(t.id)+'">Cancel</button>':'')+'</div>';}).join('')+'</div>':empty('wallet','No wallet activity','Deposits and withdrawals will show here once you submit a request.'))+
@@ -191,7 +193,7 @@ case 'theme-toggle':toggleTheme();break;
 case 'deposit':paymentModal('deposit');break;
 case 'withdraw':paymentModal('withdraw');break;
 case 'vip-claim':await run('vipClaim',{},'VIP daily reward credited!');break;
-case 'cancel-withdraw':if(confirm('Cancel this pending withdrawal and release the reserved AFN?'))await run('cancelWithdrawal',{requestId:target.dataset.id},'Withdrawal cancelled');break;
+case 'cancel-withdraw':if(confirm('Cancel this pending withdrawal and release the reserved funds?'))await run('cancelWithdrawal',{requestId:target.dataset.id},'Withdrawal cancelled');break;
 case 'admin-money-approve':if(confirm('Approve this manual payment request? Verify the real-world payment or payout first.'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:true});break;
 case 'admin-money-reject':if(confirm('Reject this payment request?'))await adminAction('reviewMoney',{requestId:target.dataset.id,approve:false});break;
 case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
