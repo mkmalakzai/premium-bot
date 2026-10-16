@@ -102,11 +102,11 @@ function notificationText(entry){
  const stamp=new Date(entry.createdAt||Date.now()).toISOString().slice(0,16).replace('T',' ')+' UTC';
  const type=entry.type==='deposit'?'DEPOSIT CONFIRMED':'WITHDRAWAL COMPLETED';
  const icon=entry.type==='deposit'?'💳':'💸';
- const safeAmount=Number.isSafeInteger(entry.amount)?entry.amount.toLocaleString('en-US'):'0';
+ const safeAmount=Number(entry.amount||0).toLocaleString('en-US',{maximumFractionDigits:4});
  const id=String(entry.userId||''),masked=id?'•••• '+id.slice(-4):'AFGLION member';
  return ['🦁 <b>AFGLION · MEMBERS CLUB</b>','━━━━━━━━━━━━━━━━',
  icon+' <b>'+type+'</b>','',
- '✅ <b>Status:</b> Approved','💰 <b>Amount:</b> '+safeAmount+' AFN',
+ '✅ <b>Status:</b> Approved','💰 <b>Amount:</b> '+safeAmount+' '+(entry.currency||'AFN'),
  '👤 <b>Member:</b> '+masked,'🕒 <b>Time:</b> '+stamp,
  '━━━━━━━━━━━━━━━━','✨ <i>Trusted service. Premium experience.</i>'].join('\n');
 }
@@ -312,8 +312,8 @@ async function route(req){
   return {user:visibleUser(u.data(),id,role),settings:ss,
    referrals:r.docs.map(d=>({id:d.id,name:d.data().name||'Member',photoUrl:d.data().photoUrl||'',joinedAt:d.data().joinedAt||0})).sort((x,y)=>y.joinedAt-x.joinedAt),
    vipRequest:v.exists?v.data():null,
-   transactions:m.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>y.createdAt-x.createdAt),
-   activity:a.docs.map(d=>d.data())
+   transactions:m.docs.map(d=>{const item=d.data();const old=ss.currencyMigrationStatus==='active'&&item.currency!=='USDT';return {...item,id:d.id,amount:old?round4(item.amount/Number(ss.migrationRate||65)):item.amount,originalAmount:item.originalAmount===undefined?item.amount:item.originalAmount,originalCurrency:item.originalCurrency||item.currency||'AFN',currency:old?'USDT':item.currency||'AFN'};}).sort((x,y)=>y.createdAt-x.createdAt),
+   activity:a.docs.map(d=>{const item=d.data();return {...item,amount:ss.currencyMigrationStatus==='active'&&item.currency!=='USDT'?round4(Number(item.amount||0)/Number(ss.migrationRate||65)):item.amount,currency:ss.currencyMigrationStatus==='active'?'USDT':'AFN'};})
   };
  }
  if(action==='claim'){
@@ -449,7 +449,8 @@ async function route(req){
    store.collection(C.money).where('status','==','pending').limit(200).get(),settingRef.get(),users.count().get(),store.collection(C.roles).limit(100).get(),
    store.collection(C.notices).orderBy('createdAt','desc').limit(60).get()
   ]);
-  const members=us.docs.map(d=>({...d.data(),id:d.id})), moneyRequests=m.docs.map(d=>({...d.data(),id:d.id})).sort((x,y)=>x.createdAt-y.createdAt);
+  const cfgAdmin=settings(ss);
+  const members=us.docs.map(d=>({...d.data(),id:d.id})), moneyRequests=m.docs.map(d=>{const item=d.data();const old=cfgAdmin.currencyMigrationStatus==='active'&&item.currency!=='USDT';return {...item,id:d.id,amount:old?round4(item.amount/Number(cfgAdmin.migrationRate||65)):item.amount,originalAmount:item.originalAmount===undefined?item.amount:item.originalAmount,originalCurrency:item.originalCurrency||item.currency||'AFN',currency:old?'USDT':item.currency||'AFN'};}).sort((x,y)=>x.createdAt-y.createdAt);
   const notices=noticeSnap.docs.filter(d=>d.data().status!=='sent').map(d=>({...d.data(),id:d.id}));
   return {callerRole:role,staffRoles:staffSnap.docs.map(d=>({id:d.id,role:d.data().role})),rootOwners:role==='owner'?[...admins()]:[],users:members,moneyRequests,notices,settings:settings(ss),
    stats:{members:total.data().count,vip:members.filter(u=>u.vipUntil>Date.now()).length,pending:moneyRequests.length,points:members.reduce((sum,u)=>sum+(u.balance||0),0)},sampled:members.length<total.data().count};
