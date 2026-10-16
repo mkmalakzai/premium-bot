@@ -613,9 +613,9 @@ async function route(req){
        update[field]=round4(old/rate);
       }
      }
-     if(previous.vipPlanSnapshot){
-      const plan=previous.vipPlanSnapshot;
-      update.vipPlanSnapshot={...plan,price:round4(Number(plan.price||0)/rate),dailyReward:round4(Number(plan.dailyReward||0)/rate)};
+     const legacyPlan=previous.vipPlanSnapshot||(previous.vipTier&&previous.vipTier!=='free'&&(previous.vipUntil||0)>Date.now()?c.vipPackages[previous.vipTier]:null);
+     if(legacyPlan){
+      update.vipPlanSnapshot={...legacyPlan,price:round4(Number(legacyPlan.price||0)/rate),dailyReward:round4(Number(legacyPlan.dailyReward||0)/rate)};
      }
      tx.set(backup,{userId:userDoc.id,rate,migratedAt:Date.now(),legacy:previous});
      tx.update(userRef,update);
