@@ -206,13 +206,15 @@ async function route(req){
   const ref=users.doc(userId),now=Date.now(),ss=settings(await settingRef.get());
   if(ss.currencyMigrationStatus==='migrating'||!ss.adsEnabled||ss.adsBlockId!=='52925'||!ss.adsReward)return {ok:true,credited:false};
   return await store.runTransaction(async tx=>{
-   const snap=await tx.get(ref);
+   const [snap,settingDoc]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!snap.exists||snap.data().banned)return {ok:true,credited:false};
+   const liveCfg=settings(settingDoc);
+   if(liveCfg.currencyMigrationStatus==='migrating'||(liveCfg.currencyMigrationStatus==='active'&&snap.data().currencyVersion!==2))return {ok:true,credited:false};
    const u=snap.data(),pending=u.adsPending||{},day=new Date(now).toISOString().slice(0,10);
    if(!pending.id||pending.expiresAt<now||pending.createdAt>now||pending.createdAt<now-600000||pending.day!==day)return {ok:true,credited:false};
    const count=u.adsDay===day?(u.adsToday||0):0;
    if(count>=ss.adsDailyLimit)return {ok:true,credited:false};
-   const reward=ss.adsReward;
+   const reward=liveCfg.adsReward;
    tx.update(ref,{earningsBalance:admin.firestore.FieldValue.increment(reward),earningsTotal:admin.firestore.FieldValue.increment(reward),adsToday:count+1,adsDay:day,adsPending:admin.firestore.FieldValue.delete(),adsLastRewardAt:now});
    tx.set(ref.collection('activity').doc(),{label:'AdsGram rewarded ad',amount:reward,wallet:'earnings',at:now});
    return {ok:true,credited:true};
@@ -267,9 +269,10 @@ async function route(req){
   return await store.runTransaction(async tx=>{
    const u=await tx.get(ref);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
-   const current=Math.round(Number(u.data().earningsBalance||0)*100);
-   if(!Number.isSafeInteger(current)||current<1000)fail(409,'Earn at least 10 AFN before claiming to your main wallet');
-   const amount=current/100;
+   const ss=settings(await tx.get(settingRef));requireCurrencyReady(ss,u.data());
+   const amount=round4(Number(u.data().earningsBalance||0));
+   const minimum=ss.currencyMigrationStatus==='active'?Number(ss.adsClaimMinimum||round4(10/65)):10;
+   if(!Number.isFinite(amount)||amount<minimum)fail(409,'Earn at least '+minimum+' '+(ss.currencyMigrationStatus==='active'?'USDT':'AFN')+' before claiming');
    tx.update(ref,{
     earningsBalance:0,
     earningsClaimed:admin.firestore.FieldValue.increment(amount),
@@ -285,8 +288,9 @@ async function route(req){
   const now=Date.now(),day=new Date(now).toISOString().slice(0,10),ss=settings(await settingRef.get());
   if(!ss.adsEnabled||ss.adsBlockId!=='52925'||ss.adsReward<=0)fail(403,'Watch & Earn is not enabled yet');
   return store.runTransaction(async tx=>{
-   const u=await tx.get(ref);
+   const [u,st]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
+   requireCurrencyReady(settings(st),u.data());
    const count=u.data().adsDay===day?(u.data().adsToday||0):0;
    if(count>=ss.adsDailyLimit)fail(429,'Daily ad limit reached');
    const pending=u.data().adsPending||{};
