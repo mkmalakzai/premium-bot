@@ -384,7 +384,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  html+=(a.sampled?'<div class="alert">Showing only the first 500 members. Sorting applies to the loaded members, not the complete database.</div>':'');
  html+='<div class="admin-callout">All balances are stored per Telegram account. Use Manage to add or deduct funds and control VIP or account status.</div>'+
  '<input id="admin-search" class="field" placeholder="Search name, username or ID" aria-label="Search members" autocomplete="off">'+
- '<select id="admin-user-sort" class="field" aria-label="Sort users"><option value="newest">Newest first</option><option value="balance-desc">Balance: highest first</option><option value="balance-asc">Balance: lowest first</option><option value="vip">VIP members first</option><option value="free">Free members first</option></select>'+
+ '<select id="admin-user-sort" class="field" aria-label="Sort users"><option value="newest">Newest first</option><option value="balance-desc">Balance: highest first</option><option value="balance-asc">Balance: lowest first</option><option value="vip">VIP members first</option><option value="free">Free members first</option><option value="deposits">Most deposited</option><option value="earnings">Highest total earnings</option><option value="oldest">Oldest first</option></select>'+
  '<div id="admin-users">'+adminUserRows(a.users)+'</div>';
  }
 
@@ -499,7 +499,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  root.className='app-shell admin-shell';root.innerHTML=html+footer()+'</div>'+adminTabs();
  var search=document.getElementById('admin-search');
  var sortSelect=document.getElementById('admin-user-sort');
- function updateUserRows(){var q=(search&&search.value||'').toLowerCase().trim(),mode=sortSelect&&sortSelect.value;var rows=a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}).slice();rows.sort(function(x,y){var xb=Number(x.balance||0),yb=Number(y.balance||0),xv=x.vipTier&&x.vipTier!=='free'&&x.vipUntil>Date.now()?1:0,yv=y.vipTier&&y.vipTier!=='free'&&y.vipUntil>Date.now()?1:0;if(mode==='balance-desc')return yb-xb;if(mode==='balance-asc')return xb-yb;if(mode==='vip')return yv-xv;if(mode==='free')return xv-yv;return Number(y.joinedAt||y.createdAt||0)-Number(x.joinedAt||x.createdAt||0);});document.getElementById('admin-users').innerHTML=adminUserRows(rows);}
+ function updateUserRows(){var q=(search&&search.value||'').toLowerCase().trim(),mode=sortSelect&&sortSelect.value;var rows=a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}).slice();rows.sort(function(x,y){var xb=Number(x.balance||0),yb=Number(y.balance||0),xv=x.vipTier&&x.vipTier!=='free'&&x.vipUntil>Date.now()?1:0,yv=y.vipTier&&y.vipTier!=='free'&&y.vipUntil>Date.now()?1:0;if(mode==='balance-desc')return yb-xb;if(mode==='balance-asc')return xb-yb;if(mode==='vip')return yv-xv;if(mode==='free')return xv-yv;if(mode==='deposits')return Number(y.totalDeposited||0)-Number(x.totalDeposited||0);if(mode==='earnings')return Number(y.totalEarned||0)-Number(x.totalEarned||0);if(mode==='oldest')return Number(x.joinedAt||x.createdAt||0)-Number(y.joinedAt||y.createdAt||0);return Number(y.joinedAt||y.createdAt||0)-Number(x.joinedAt||x.createdAt||0);});document.getElementById('admin-users').innerHTML=adminUserRows(rows);}
  if(search)search.addEventListener('input',updateUserRows);
  if(sortSelect)sortSelect.addEventListener('change',updateUserRows);
 }
