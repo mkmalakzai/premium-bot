@@ -512,8 +512,8 @@ function openUserModal(id){var u=state.admin.users.find(function(x){return x.id=
  var roleLabel=isRoot?'Root owner':staff?staff.role:'Member';
  modal('Manage member','<div class="user-row" style="margin-top:16px">'+avatar(u)+'<div class="user-main"><strong>'+esc(u.name)+'</strong><small>ID '+esc(u.id)+' · '+esc(roleLabel)+'</small></div></div>'+
  '<div class="admin-balance-overview"><small>Available balance</small><strong>'+currency(u.balance)+'</strong></div>'+
- '<div class="inline-fields"><div><label class="form-label">Add balance (AFN)</label><input class="field" id="user-credit" type="number" min="0" max="100000" step="1" value="0"></div>'+
- '<div><label class="form-label">Deduct balance (AFN)</label><input class="field" id="user-deduct" type="number" min="0" max="100000" step="1" value="0"></div></div>'+
+ '<div class="inline-fields"><div><label class="form-label">Add balance ('+unit()+')</label><input class="field" id="user-credit" type="number" min="0" max="100000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="0"></div>'+
+ '<div><label class="form-label">Deduct balance ('+unit()+')</label><input class="field" id="user-deduct" type="number" min="0" max="100000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="0"></div></div>'+
  '<div class="admin-callout">Only one balance adjustment at a time. Deductions cannot make the balance negative.</div>'+
  '<label class="form-label">VIP membership</label><select class="field" id="user-tier">'+tierOptions+'</select>'+
  '<label class="form-label">Account status</label><select class="field" id="user-ban"><option value="false" '+(!u.banned?'selected':'')+'>Active</option><option value="true" '+(u.banned?'selected':'')+'>Banned</option></select>'+
@@ -521,7 +521,7 @@ function openUserModal(id){var u=state.admin.users.find(function(x){return x.id=
 
 async function saveAdminUser(){var el=document.querySelector('[data-action="admin-save-user"]');if(!el)return;
  var credit=Number(document.getElementById('user-credit').value),deduction=Number(document.getElementById('user-deduct').value);
- if(!Number.isSafeInteger(credit)||!Number.isSafeInteger(deduction)||credit<0||deduction<0)return toast('Enter valid whole AFN amounts');
+ if(!Number.isFinite(credit)||!Number.isFinite(deduction)||credit<0||deduction<0||Math.abs(credit-Math.round(credit*10000)/10000)>1e-8||Math.abs(deduction-Math.round(deduction*10000)/10000)>1e-8)return toast('Enter valid amounts (up to 4 decimal places)');
  if(credit&&deduction)return toast('Use either Add or Deduct, not both');
  if(deduction&&!confirm('Confirm manual deduction of '+currency(deduction)+' from this member?'))return;
  await adminAction('updateUser',{userId:el.dataset.id,tier:document.getElementById('user-tier').value,balanceDelta:credit-deduction,banned:document.getElementById('user-ban').value==='true'});}
@@ -558,7 +558,7 @@ function packageModal(key){var packages=state.admin.settings.vipPackages||state.
 if(key&&!p)return toast('VIP package not found');
 modal(key?'Edit VIP package':'Create VIP package',
  '<form id="package-form" data-id="'+esc(key||'')+'"><label class="form-label">Package name</label><input class="field" id="package-name" maxlength="45" minlength="3" value="'+esc(p&&p.name||'')+'" placeholder="e.g. Diamond VIP" required>'+
- '<div class="inline-fields"><div><label class="form-label">Price (AFN)</label><input class="field" id="package-price" type="number" min="1" max="1000000" step="1" value="'+(p?p.price:500)+'" required></div><div><label class="form-label">Daily reward (AFN)</label><input class="field" id="package-daily" type="number" min="0" max="100000" step="1" value="'+(p?p.dailyReward:50)+'" required></div></div>'+
+ '<div class="inline-fields"><div><label class="form-label">Price ('+unit()+')</label><input class="field" id="package-price" type="number" min="'+(unit()==='USDT'?'0.0001':'1')+'" max="1000000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="'+(p?p.price:(unit()==='USDT'?5:500))+'" required></div><div><label class="form-label">Daily reward ('+unit()+')</label><input class="field" id="package-daily" type="number" min="0" max="100000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="'+(p?p.dailyReward:(unit()==='USDT'?0:50))+'" required></div></div>'+
  '<label class="form-label">Duration in days</label><input class="field" id="package-days" type="number" min="1" max="365" step="1" value="'+(p?p.days:30)+'" required>'+
  '<label class="form-label">Visibility</label><select class="field" id="package-enabled"><option value="yes" '+(!p||p.enabled!==false?'selected':'')+'>Visible to users</option><option value="no" '+(p&&p.enabled===false?'selected':'')+'>Hidden</option></select>'+
  '<div class="alert">Changing a package will not change rewards already approved for existing members.</div>'+
