@@ -432,7 +432,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  }
  if(tab==='methods'){
  var methods=a.settings.paymentMethods||[];
- html+='<div class="admin-callout">Add receiving methods such as Hawala, bank or mobile wallet. The chosen number appears to customers on Deposit with a Copy button.</div>'+
+ html+='<div class="admin-callout">Add AFN receiving accounts and USDT blockchain addresses. For USDT, choose the exact network (TRC20, BEP20, ERC20, TON or SOLANA). Incoming transfers require manual verification.</div>'+
  '<button class="btn btn-primary btn-block" data-action="admin-add-method">'+icon('wallet')+' Add payment method</button>'+
  (methods.length?methods.map(function(m){
  return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(m.name)+' · '+esc(m.currency||'AFN')+(m.currency==='USDT'?' / '+esc(m.network||'?'):'')+'</b><small>'+esc(m.number||'No receiving number')+'</small></div><span class="badge '+(m.enabled===false?'red':'green')+'">'+(m.enabled===false?'HIDDEN':'ACTIVE')+'</span></div>'+
@@ -475,7 +475,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  '<label class="check-row"><input type="checkbox" id="admin-daily-enabled" '+(st.dailyEnabled?'checked':'')+'> Enable free daily check-in</label>'+
  '<div class="inline-fields">'+adminNumber('Daily reward ('+unit()+')','admin-daily',st.dailyBonus,0,1000)+adminNumber('VIP referral %','admin-referral',st.referralPercent,0,50)+'</div></div></details>'+
  '<details class="admin-section"><summary>'+icon('wallet')+' Deposit & withdrawals <span>⌄</span></summary><div class="admin-section-body">'+
- '<div class="inline-fields">'+adminNumber('Min deposit','admin-min-deposit',st.minDeposit,1,100000)+adminNumber('Min withdraw','admin-min-withdraw',st.minWithdraw,1,100000)+'</div>'+
+ '<div class="inline-fields">'+adminNumber('Min deposit','admin-min-deposit',st.minDeposit,unit()==='USDT'?0.0001:1,100000)+adminNumber('Min withdraw','admin-min-withdraw',st.minWithdraw,unit()==='USDT'?0.0001:1,100000)+'</div>'+
  '<label class="form-label">Deposit admin Telegram username (editable)</label><input class="field" id="admin-deposit-contact" value="'+esc(st.depositContact||'Mk_Malakzai')+'">'+
  '<label class="form-label">Deposit instructions</label><textarea id="admin-deposit-inst" class="field" maxlength="500">'+esc(st.depositInstructions||'')+'</textarea>'+
  '<label class="form-label">Withdrawal instructions</label><textarea id="admin-payout-inst" class="field" maxlength="500">'+esc(st.payoutInstructions||'')+'</textarea>'+
