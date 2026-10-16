@@ -53,7 +53,7 @@ function validMoney(x,min,max){return typeof x==='number'&&Number.isFinite(x)&&x
 function requireCurrencyReady(config,user){if(config.currencyMigrationStatus==='migrating')fail(503,'USDT migration is underway. Transactions are temporarily paused.');if(config.currencyMigrationStatus==='active'&&user&&user.currencyVersion!==2)fail(503,'Currency conversion is pending for this account');}
 function requestUsdt(item,config){return item.currency==='USDT'?Number(item.amount):round4(Number(item.amount)/Number(config.migrationRate||65));}
 function whole(x,min,max){return typeof x==='number'&&Number.isSafeInteger(x)&&x>=min&&x<=max;}
-function checkAmount(x,min,max){if(!whole(x,min,max))fail(400,'Invalid AFN amount');return x;}
+function checkAmount(x,min,max){if(!validMoney(x,min,max))fail(400,'Invalid monetary amount');return x;}
 function settings(s){
  const data=s&&s.exists?s.data():{};
  const plans={...DEFAULTS.plans,...(data.plans||{})};
@@ -190,7 +190,7 @@ async function signedIn(req,store){
  if(snap.data().banned)fail(403,'Account restricted');
  return {id,ref,snap,role};
 }
-function planFor(s,tier){const p=s.vipPackages[tier];if(!p||p.enabled===false||!whole(p.price,1,1000000)||!whole(p.dailyReward,0,100000)||!whole(p.days,1,365))fail(400,'VIP package is unavailable');return p;}
+function planFor(s,tier){const p=s.vipPackages[tier];if(!p||p.enabled===false||!validMoney(p.price,0.0001,1000000)||!validMoney(p.dailyReward,0,100000)||!whole(p.days,1,365))fail(400,'VIP package is unavailable');return p;}
 function isAdmin(id){return admins().has(id);}
 async function route(req){
  const action=String(req.query.action||'');
@@ -251,8 +251,9 @@ async function route(req){
   if(snapshot.data().banned)fail(403,'Account restricted');
   return {token:signSession(id)};
  }
- const {id,ref,role}=await signedIn(req,store);
+ const {id,ref,role,snap:authSnap}=await signedIn(req,store);
  const currentSettings=settings(await settingRef.get());
+ if(currentSettings.currencyMigrationStatus==='active'&&authSnap.data().currencyVersion!==2)fail(503,'Account currency conversion not completed. Contact support.');
  if(currentSettings.currencyMigrationStatus==='migrating'&&!['me','adminData','adminAction','joinStatus','adStatus','profileUpdate'].includes(action))fail(503,'USDT conversion in progress; money actions are paused.');
  const membership=await memberStatus(id,currentSettings,role);
  if(action==='joinStatus')return {joined:membership.joined,joinRequired:!membership.joined,joinUrl:membership.url,joinIssue:membership.issue};
@@ -324,6 +325,7 @@ async function route(req){
    const last=u.data().lastClaimAt||0;
    if(now-last<DAY)fail(429,'Daily check-in is available every 24 hours');
    const config=settings(s);
+   requireCurrencyReady(config,u.data());
    if(!config.dailyEnabled)fail(403,'Free daily check-in is disabled');
    const bonus=config.dailyBonus;
    checkAmount(bonus,0,1000);
@@ -339,7 +341,8 @@ async function route(req){
   return await store.runTransaction(async tx=>{
    const [u,s]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
-   const usr=u.data(),p=usr.vipPlanSnapshot||planFor(settings(s),usr.vipTier);
+   const usr=u.data();requireCurrencyReady(settings(s),usr);
+   const p=usr.vipPlanSnapshot||planFor(settings(s),usr.vipTier);
    const began=usr.vipActivatedAt||0, until=usr.vipUntil||0;
    const slot=Math.min(p.days,Math.floor((now-began)/DAY));
    if(!began||!until||now>until+DAY||slot<1||slot<=(usr.vipLastClaimSlot||0))fail(409,'Next VIP reward is not available yet');
@@ -361,40 +364,50 @@ async function route(req){
   if(req.method!=='POST')fail(405,'POST required');
   const type=body.type;
   if(!['deposit','withdraw'].includes(type))fail(400,'Invalid transaction type');
-  const amount=checkAmount(body.amount,1,1000000);
+  const originalAmount=Number(body.amount);
   const paymentReference=type==='deposit'?secureString(body.reference||body.details,300):'';
   const payoutRecipient=type==='withdraw'?secureString(body.recipient||body.details,300):'';
   const details=type==='deposit'?paymentReference:payoutRecipient;
-  if(details.length<5)fail(400,type==='deposit'?'Provide your deposit transfer reference':'Provide the withdrawal recipient phone or account');
+  if(details.length<5)fail(400,type==='deposit'?'Provide the transfer reference':'Provide your receiving account or wallet address');
   const submittedMethod=secureString(body.methodId||body.method,70);
-  const current=settings(await settingRef.get());
-  const selected=current.paymentMethods.find(m=>m.enabled!==false&&(m.id===submittedMethod||m.name===submittedMethod));
-  if(!selected)fail(400,'Choose an available payment method');
-  if(type==='deposit'&&!selected.number)fail(503,'The administrator has not configured a receiving number for this method');
-  const method=selected.name;
   const reqRef=store.collection(C.money).doc(),now=Date.now();
   return await store.runTransaction(async tx=>{
    const [u,s]=await Promise.all([tx.get(ref),tx.get(settingRef)]);
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
-   const setting=settings(s);
-   if(amount<(type==='deposit'?setting.minDeposit:setting.minWithdraw))fail(400,'Amount is below the current minimum');
-   const confirmed=(setting.paymentMethods||[]).find(m=>m.id===selected.id&&m.enabled!==false);
-   if(!confirmed||(type==='deposit'&&!confirmed.number))fail(409,'Payment method was changed. Reload the app.');
-   if(type==='withdraw'&&(u.data().balance||0)<amount)fail(409,'Insufficient available AFN balance');
+   const cfg=settings(s);
+   requireCurrencyReady(cfg,u.data());
+   const active=cfg.currencyMigrationStatus==='active';
+   const originalCurrency=active?String(body.currency||'USDT'):'AFN';
+   if(!['AFN','USDT'].includes(originalCurrency))fail(400,'Choose AFN or USDT');
+   if(!validMoney(originalAmount,originalCurrency==='USDT'?0.0001:0.01,1000000))fail(400,'Invalid payment amount');
+   const method=(cfg.paymentMethods||[]).find(m=>m.enabled!==false&&(m.id===submittedMethod||m.name===submittedMethod));
+   if(!method)fail(409,'Payment method unavailable. Reload the app.');
+   if(active&&(method.currency||'AFN')!==originalCurrency)fail(400,'Payment method must match the selected currency');
+   if(type==='deposit'&&!method.number)fail(503,'Administrator has not configured a receiving account');
+   const rate=active?Number(cfg.usdtAfnRate):1;
+   if(!Number.isFinite(rate)||rate<=0)fail(503,'Invalid exchange rate');
+   const amount=active?(originalCurrency==='AFN'?round4(originalAmount/rate):round4(originalAmount)):originalAmount;
+   if(amount<Number(type==='deposit'?cfg.minDeposit:cfg.minWithdraw)-0.00000001)fail(400,'Amount is below the minimum in '+(active?'USDT':'AFN'));
+   if(type==='withdraw'&&Number(u.data().balance||0)+0.00000001<amount)fail(409,'Insufficient available balance');
    if(type==='withdraw')tx.update(ref,{balance:admin.firestore.FieldValue.increment(-amount),pendingWithdraw:admin.firestore.FieldValue.increment(amount)});
-   tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,method,methodId:selected.id,receivingNumber:type==='deposit'?selected.number:'',paymentReference,payoutRecipient,details,status:'pending',createdAt:now,reviewedAt:0});
-   tx.set(ref.collection('activity').doc(),{label:(type==='deposit'?'Deposit':'Withdrawal')+' request submitted',amount:0,at:now});
-   return {ok:true,requestId:reqRef.id};
+   tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,
+    currency:active?'USDT':'AFN',originalAmount,originalCurrency,rate:active?rate:1,
+    method:method.name,methodId:method.id,receivingNumber:type==='deposit'?method.number:'',
+    paymentReference,payoutRecipient,details,status:'pending',createdAt:now,reviewedAt:0});
+   tx.set(ref.collection('activity').doc(),{label:(type==='deposit'?'Deposit':'Withdrawal')+' request submitted',amount:0,currency:active?'USDT':'AFN',at:now});
+   return {ok:true,requestId:reqRef.id,amount,originalAmount,originalCurrency,rate};
   });
  }
  if(action==='cancelWithdrawal'){
   if(req.method!=='POST')fail(405,'POST required');
   const requestId=secureString(body.requestId,100),requestRef=store.collection(C.money).doc(requestId);
   return await store.runTransaction(async tx=>{
-   const [r,u]=await Promise.all([tx.get(requestRef),tx.get(ref)]);
+   const [r,u,settingSnap]=await Promise.all([tx.get(requestRef),tx.get(ref),tx.get(settingRef)]);
    if(!r.exists||r.data().userId!==id||r.data().type!=='withdraw'||r.data().status!=='pending')fail(409,'Pending withdrawal not found');
+   const cfg=settings(settingSnap);requireCurrencyReady(cfg,u.data());
+   const value=cfg.currencyMigrationStatus==='active'?requestUsdt(r.data(),cfg):r.data().amount;
    tx.update(requestRef,{status:'cancelled',reviewedAt:Date.now()});
-   tx.update(ref,{balance:admin.firestore.FieldValue.increment(r.data().amount),pendingWithdraw:admin.firestore.FieldValue.increment(-r.data().amount)});
+   tx.update(ref,{balance:admin.firestore.FieldValue.increment(value),pendingWithdraw:admin.firestore.FieldValue.increment(-value)});
    return {ok:true};
   });
  }
@@ -408,7 +421,8 @@ async function route(req){
    if(!u.exists||u.data().banned)fail(403,'Account restricted');
    const who=u.data(),config=settings(s),packageInfo=planFor(config,tier);
    if((who.vipUntil||0)>now&&who.vipTier&&who.vipTier!=='free')fail(409,'Finish your active VIP membership before buying another package');
-   if((who.balance||0)<packageInfo.price)fail(409,'Insufficient AFN balance. Deposit first and wait for deposit approval.');
+   requireCurrencyReady(config,who);
+   if((who.balance||0)<packageInfo.price)fail(409,'Insufficient balance. Deposit first and wait for deposit approval.');
    const parentId=who.referrerId,linkedRef=parentId&&parentId!==id?users.doc(parentId):null;
    const linked=linkedRef?await tx.get(linkedRef):null;
    const purchasedPackage={name:packageInfo.name,price:packageInfo.price,dailyReward:packageInfo.dailyReward,days:packageInfo.days,enabled:true};
@@ -417,7 +431,7 @@ async function route(req){
     vipDaysClaimed:0,vipLastClaimSlot:0});
    tx.set(ref.collection('activity').doc(),{label:packageInfo.name+' VIP purchase',amount:-packageInfo.price,at:now});
    const referralPct=config.referralPercent||0;
-   const award=Math.floor(packageInfo.price*referralPct/100);
+   const award=round4(packageInfo.price*referralPct/100);
    if(linked&&linked.exists&&!linked.data().banned&&award>0){
     tx.update(linkedRef,{balance:admin.firestore.FieldValue.increment(award),totalEarned:admin.firestore.FieldValue.increment(award),
      referralEarned:admin.firestore.FieldValue.increment(award)});
