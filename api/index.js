@@ -81,7 +81,8 @@ function safePackage(value){
  const min=currency==='AFN'?0.01:0.0001;
  const price=checkAmount(value.price,min,1000000),dailyReward=checkAmount(value.dailyReward,0,100000);
  if(currency==='AFN'&&(Math.abs(price-Math.round(price*100)/100)>1e-8||Math.abs(dailyReward-Math.round(dailyReward*100)/100)>1e-8))fail(400,'AFN packages allow only 2 decimal places');
- return {name,price,dailyReward,currency,days:checkAmount(value.days,1,365),enabled:value.enabled!==false};
+ if(!whole(value.days,1,365))fail(400,'VIP duration must be a whole number of days (1–365)');
+ return {name,price,dailyReward,currency,days:value.days,enabled:value.enabled!==false};
 }
 async function memberStatus(id,config,role='user'){
  const url=channelUrl(config.forceJoinChannel);
@@ -445,6 +446,7 @@ async function route(req){
    if(walletPrice<=0)fail(400,'VIP price is too small at the current exchange rate');
    if(walletReward<0||!Number.isFinite(walletReward))fail(400,'Invalid VIP reward');
    if((who.balance||0)+0.00000001<walletPrice)fail(409,'Insufficient USDT wallet balance for this VIP package');
+   if(linked&&linked.exists&&config.currencyMigrationStatus==='active'&&linked.data().currencyVersion!==2)fail(503,'Referrer account conversion is incomplete');
    const purchasedPackage={name:packageInfo.name,price:walletPrice,dailyReward:walletReward,days:packageInfo.days,enabled:true,
     currency:'USDT',originalCurrency:packageCurrency,originalPrice:packageInfo.price,originalDailyReward:packageInfo.dailyReward,
     exchangeRateAtPurchase:packageCurrency==='AFN'?rate:null};
