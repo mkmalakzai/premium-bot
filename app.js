@@ -85,6 +85,7 @@ function nav(){return '<nav class="bottom-nav" aria-label="Main navigation">'+[
 
 function unit(){return data()&&data().settings&&data().settings.currencyMigrationStatus==='active'?'USDT':'AFN';}
 function currency(v){return n(v)+' '+unit();}
+function memberCurrency(v,u){return n(v)+' '+(data().settings.currencyMigrationStatus==='migrating'&&u&&u.currencyVersion===2?'USDT':unit());}
 function originalPayment(t){return n(t.originalAmount===undefined?t.amount:t.originalAmount)+' '+(t.originalCurrency||t.currency||'AFN');}
 function vipName(u){u=u||user();if(!u.vipTier||u.vipTier==='free')return 'Free';var p=u.vipPlanSnapshot||((data().settings.vipPackages||data().settings.plans||{})[u.vipTier]);if(p&&p.name)return p.name;return /^vip_/.test(u.vipTier)?'VIP Member':u.vipTier.replace(/_/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
 function setTheme(){document.documentElement.setAttribute('data-theme',state.theme);try{if(tg){tg.setHeaderColor(state.theme==='light'?'#f2f4f8':'#090c12');tg.setBackgroundColor(state.theme==='light'?'#f2f4f8':'#090c12');}}catch(e){}}
@@ -359,7 +360,7 @@ function adminUserRows(users){
  var title=u.vipPlanSnapshot&&u.vipPlanSnapshot.name||plans[u.vipTier]&&plans[u.vipTier].name||(/vip_/.test(u.vipTier||'')?'VIP':u.vipTier||'free');
  var staff=state.admin.staffRoles.find(function(x){return x.id===u.id;});
  var isRoot=(state.admin.rootOwners||[]).includes(u.id);
- return '<div class="admin-row"><div class="admin-row-person"><strong>'+esc(u.name||'Member')+'</strong> '+(u.banned?'<span class="badge red">BANNED</span>':'')+(staff||isRoot?'<span class="badge">'+esc(isRoot?'OWNER':staff.role.toUpperCase())+'</span>':'')+'<small>ID '+esc(u.id)+' · '+currency(u.balance)+' · '+esc(title)+'</small></div><button class="btn btn-ghost btn-small" data-action="admin-user" data-id="'+esc(u.id)+'">Manage</button></div>';
+ return '<div class="admin-row"><div class="admin-row-person"><strong>'+esc(u.name||'Member')+'</strong> '+(u.banned?'<span class="badge red">BANNED</span>':'')+(staff||isRoot?'<span class="badge">'+esc(isRoot?'OWNER':staff.role.toUpperCase())+'</span>':'')+'<small>ID '+esc(u.id)+' · '+memberCurrency(u.balance,u)+' · '+esc(title)+'</small></div><button class="btn btn-ghost btn-small" data-action="admin-user" data-id="'+esc(u.id)+'">Manage</button></div>';
  }).join(''):empty('users','No members found','No matching members.');
 }
 function adminNumber(label,id,value,min,max){return '<div><label class="form-label">'+esc(label)+'</label><input class="field" id="'+id+'" type="number" min="'+min+'" max="'+max+'" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="'+n(value).replace(/,/g,'')+'"></div>';}
@@ -511,7 +512,7 @@ function openUserModal(id){var u=state.admin.users.find(function(x){return x.id=
  var isRoot=(state.admin.rootOwners||[]).includes(id);
  var roleLabel=isRoot?'Root owner':staff?staff.role:'Member';
  modal('Manage member','<div class="user-row" style="margin-top:16px">'+avatar(u)+'<div class="user-main"><strong>'+esc(u.name)+'</strong><small>ID '+esc(u.id)+' · '+esc(roleLabel)+'</small></div></div>'+
- '<div class="admin-balance-overview"><small>Available balance</small><strong>'+currency(u.balance)+'</strong></div>'+
+ '<div class="admin-balance-overview"><small>Available balance</small><strong>'+memberCurrency(u.balance,u)+'</strong></div>'+
  '<div class="inline-fields"><div><label class="form-label">Add balance ('+unit()+')</label><input class="field" id="user-credit" type="number" min="0" max="100000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="0"></div>'+
  '<div><label class="form-label">Deduct balance ('+unit()+')</label><input class="field" id="user-deduct" type="number" min="0" max="100000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="0"></div></div>'+
  '<div class="admin-callout">Only one balance adjustment at a time. Deductions cannot make the balance negative.</div>'+
