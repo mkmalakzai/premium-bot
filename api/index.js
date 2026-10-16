@@ -536,19 +536,20 @@ async function route(req){
   }
   if(type==='updateUser'){
    const targetId=String(body.userId||'');
-   if(!numericId(targetId)||!(body.tier==='free'||/^[a-z0-9_-]{2,32}$/.test(body.tier))||!whole(body.balanceDelta===undefined?body.addPoints:body.balanceDelta,-100000,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
+   if(!numericId(targetId)||!(body.tier==='free'||/^[a-z0-9_-]{2,32}$/.test(body.tier))||!validMoney(body.balanceDelta===undefined?body.addPoints:body.balanceDelta,-100000,100000)||typeof body.banned!=='boolean')fail(400,'Invalid member changes');
    const targetRole=await roleOf(targetId,store);
    if(roleRank(targetRole)>0&&role!=='owner')fail(403,'Owner approval required for staff accounts');
    if(roleRank(targetRole)>0&&body.banned)fail(400,'Staff accounts cannot be banned');
    const userRef=users.doc(targetId);
    await store.runTransaction(async tx=>{
-    const u=await tx.get(userRef);
+    const [u,s]=await Promise.all([tx.get(userRef),tx.get(settingRef)]);
     if(!u.exists)fail(404,'Member not found');
+    requireCurrencyReady(settings(s),u.data());
     const update={banned:body.banned};
     const delta=body.balanceDelta===undefined?body.addPoints:body.balanceDelta;
     if(delta<0&&(u.data().balance||0)<-delta)fail(409,'Cannot deduct more than available balance');
     if(u.data().vipTier!==body.tier||(body.tier!=='free'&&(u.data().vipUntil||0)<now)){
-     const p=body.tier==='free'?null:planFor(settings(await tx.get(settingRef)),body.tier);
+     const p=body.tier==='free'?null:planFor(settings(s),body.tier);
      update.vipTier=body.tier;update.vipActivatedAt=p?now:0;
      update.vipUntil=p?now+p.days*DAY:0;update.vipPlanSnapshot=p||null;update.vipLastClaimSlot=0;update.vipDaysClaimed=0;
     }
@@ -639,14 +640,14 @@ async function route(req){
   if(type==='saveExchangeRate'){
    if(role!=='owner')fail(403,'Owner only');
    const rate=Number(body.rate);
-   if(!Number.isFinite(rate)||rate<1||rate>1000||Math.round(rate*10000)!==Math.round(rate*10000))fail(400,'Invalid USDT/AFN rate');
+   if(!validMoney(rate,1,1000))fail(400,'Invalid USDT/AFN rate');
    await settingRef.set({usdtAfnRate:rate},{merge:true});
    return {ok:true,rate};
   }
   if(type==='saveAdsSettings'){
    if(role!=='owner')fail(403,'Owner only');
    const adsEnabled=body.adsEnabled===true,adsReward=Number(body.adsReward),adsDailyLimit=Number(body.adsDailyLimit);
-   if(!Number.isFinite(adsReward)||adsReward<0||adsReward>10||Math.round(adsReward*100)!==adsReward*100)fail(400,'Invalid ad reward');
+   if(!validMoney(adsReward,0,10))fail(400,'Invalid ad reward');
    if(!Number.isInteger(adsDailyLimit)||adsDailyLimit<1||adsDailyLimit>20)fail(400,'Invalid daily limit');
    await settingRef.set({adsEnabled,adsBlockId:'52925',adsReward,adsDailyLimit},{merge:true});
    return {ok:true};
