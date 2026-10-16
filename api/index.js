@@ -229,9 +229,10 @@ async function route(req){
   const match=/^ref_(\d{3,20})$/.exec(tele.startParam);
   const inviter=match&&match[1]!==id?match[1]:null;
   await store.runTransaction(async tx=>{
-   const existing=await tx.get(userRef);
+   const [existing,liveSettings]=await Promise.all([tx.get(userRef),tx.get(settingRef)]);
    if(existing.exists)return;
-   if(st.currencyMigrationStatus==='migrating')fail(503,'Currency migration in progress. Please try again later.');
+   const signupCfg=settings(liveSettings);
+   if(signupCfg.currencyMigrationStatus==='migrating')fail(503,'Currency migration in progress. Please try again later.');
    const parentRef=inviter?users.doc(inviter):null;
    const parent=parentRef?await tx.get(parentRef):null;
    const eligible=parent&&parent.exists&&!parent.data().banned;
@@ -242,7 +243,7 @@ async function route(req){
     photoUrl:typeof who.photo_url==='string'&&who.photo_url.startsWith('https://')?who.photo_url.slice(0,800):'',
     referrerId:eligible?inviter:null, balance:0, totalEarned:0,totalDeposited:0,totalWithdrawn:0,pendingWithdraw:0,
     referralCount:0,referralEarned:0,vipTier:'free',vipUntil:0,vipActivatedAt:0,
-    vipDaysClaimed:0,vipLastClaimSlot:0,vipPlanSnapshot:null,lastClaimAt:0,claimStreak:0,joinedAt:now,banned:false,currencyVersion:st.currencyMigrationStatus==='active'?2:1
+    vipDaysClaimed:0,vipLastClaimSlot:0,vipPlanSnapshot:null,lastClaimAt:0,claimStreak:0,joinedAt:now,banned:false,currencyVersion:signupCfg.currencyMigrationStatus==='active'?2:1
    });
    if(eligible){
     tx.update(parentRef,{referralCount:admin.firestore.FieldValue.increment(1)});
