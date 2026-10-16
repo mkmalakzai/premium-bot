@@ -333,7 +333,7 @@ document.addEventListener('input',function(e){if(e.target&&e.target.id==='money-
 
 document.addEventListener('submit',async function(e){if(e.target.id==='staff-form'){e.preventDefault();if(!confirm('Update role for this Telegram user?'))return;await adminAction('setRole',{userId:document.getElementById('staff-id').value.trim(),role:document.getElementById('staff-role').value});return;}
 if(e.target.id==='method-form'){e.preventDefault();await adminAction('savePaymentMethod',{methodId:e.target.dataset.id,method:{name:document.getElementById('method-name').value.trim(),number:document.getElementById('method-number').value.trim(),currency:document.getElementById('method-currency').value,network:document.getElementById('method-network').value,enabled:document.getElementById('method-enabled').value==='yes'}});return;}
-if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),currency:document.getElementById('package-currency').value,enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var deposit=type==='deposit',details=(deposit?document.getElementById('deposit-reference'):document.getElementById('withdraw-recipient')).value.trim();closeModal();await run('moneyRequest',{type:type,amount:amount,currency:document.getElementById('money-currency')?document.getElementById('money-currency').value:'AFN',methodId:methodId,reference:deposit?details:'',recipient:deposit?'':details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
+if(e.target.id==='package-form'){e.preventDefault();var key=e.target.dataset.id;await adminAction('saveVipPackage',{packageId:key,package:{name:document.getElementById('package-name').value,price:getNum('package-price'),dailyReward:getNum('package-daily'),days:getNum('package-days'),currency:document.getElementById('package-currency').value,enabled:document.getElementById('package-enabled').value==='yes'}});return;}if(e.target.id==='money-form'){e.preventDefault();var type=e.target.dataset.type;var amount=Number(document.getElementById('money-amount').value);var methodId=document.getElementById('money-method').value;var deposit=type==='deposit',details=(deposit?document.getElementById('deposit-reference'):document.getElementById('withdraw-recipient')).value.trim(),selectedCurrency=document.getElementById('money-currency')?document.getElementById('money-currency').value:'AFN';closeModal();await run('moneyRequest',{type:type,amount:amount,currency:selectedCurrency,methodId:methodId,reference:deposit?details:'',recipient:deposit?'':details},'Request submitted for manual review');state.page='wallet';render();return;}if(e.target.id==='name-form'){e.preventDefault();var name=document.getElementById('new-name').value.trim();if(name.length<2)return toast('Name is too short');closeModal();await run('profileUpdate',{name:name},'Name updated');}});
 async function loadAdmin(){if(state.demo){toast('Admin requires verified Telegram sign-in');state.page='profile';render();return;}try{state.admin=await api('adminData');renderAdmin();window.scrollTo({top:0,behavior:'smooth'});}catch(e){toast(e.message);state.page='profile';render();}}
 
 
@@ -559,16 +559,34 @@ function methodModal(key){var list=state.admin.settings.paymentMethods||[],m=key
  '<div class="alert">The user will see the selected receiving number with a Copy button. Verify transfers manually before approving deposits.</div>'+
  '<button class="btn btn-primary btn-block" style="margin-top:17px">Save payment method</button></form>');}
 
-function packageModal(key){var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{},p=key?packages[key]:null;
-if(key&&!p)return toast('VIP package not found');
-modal(key?'Edit VIP package':'Create VIP package',
+function updateVipPackageQuote(){
+ var select=document.getElementById('package-currency'),price=document.getElementById('package-price'),reward=document.getElementById('package-daily'),labelPrice=document.getElementById('package-price-label'),labelReward=document.getElementById('package-reward-label'),quote=document.getElementById('package-wallet-quote');
+ if(!select||!price||!reward)return;
+ var cur=select.value,afn=cur==='AFN',rate=Number(state.admin&&state.admin.settings&&state.admin.settings.usdtAfnRate||65);
+ price.step=afn?'0.01':'0.0001';price.min=afn?'0.01':'0.0001';
+ reward.step=afn?'0.01':'0.0001';
+ if(labelPrice)labelPrice.textContent='Price ('+cur+')';
+ if(labelReward)labelReward.textContent='Daily reward ('+cur+')';
+ var p=Number(price.value)||0,r=Number(reward.value)||0;
+ if(quote)quote.textContent=afn?'USDT wallet quote at '+n(rate)+' AFN/USDT: '+n(Math.round(p/rate*10000)/10000)+' USDT to activate · '+n(Math.round(r/rate*10000)/10000)+' USDT per eligible day. The actual rate is locked at purchase.':'USDT wallet charge: '+n(p)+' USDT · daily reward: '+n(r)+' USDT.';
+}
+function packageModal(key){
+ var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{},p=key?packages[key]:null,cur=p&&p.currency||'USDT';
+ if(key&&!p)return toast('VIP package not found');
+ modal(key?'Edit VIP package':'Create VIP package',
  '<form id="package-form" data-id="'+esc(key||'')+'"><label class="form-label">Package name</label><input class="field" id="package-name" maxlength="45" minlength="3" value="'+esc(p&&p.name||'')+'" placeholder="e.g. Diamond VIP" required>'+
- '<label class="form-label">Package currency</label><select class="field" id="package-currency"><option value="USDT" '+(!p||!p.currency||p.currency==='USDT'?'selected':'')+'>USDT</option><option value="AFN" '+(p&&p.currency==='AFN'?'selected':'')+'>AFN (USDT wallet conversion)</option></select><div class="inline-fields"><div><label class="form-label">Price</label><input class="field" id="package-price" type="number" min="'+(unit()==='USDT'?'0.0001':'1')+'" max="1000000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="'+(p?p.price:(unit()==='USDT'?5:500))+'" required></div><div><label class="form-label">Daily reward ('+unit()+')</label><input class="field" id="package-daily" type="number" min="0" max="100000" step="'+(unit()==='USDT'?'0.0001':'1')+'" value="'+(p?p.dailyReward:(unit()==='USDT'?0:50))+'" required></div></div>'+
+ '<label class="form-label">Package currency</label><select class="field" id="package-currency"><option value="USDT" '+(cur==='USDT'?'selected':'')+'>USDT</option><option value="AFN" '+(cur==='AFN'?'selected':'')+'>AFN (automatically charged from USDT wallet)</option></select>'+
+ '<div class="inline-fields"><div><label class="form-label" id="package-price-label">Price ('+cur+')</label><input class="field" id="package-price" type="number" min="'+(cur==='AFN'?'0.01':'0.0001')+'" max="1000000" step="'+(cur==='AFN'?'0.01':'0.0001')+'" value="'+(p?p.price:(cur==='AFN'?300:5))+'" required></div>'+
+ '<div><label class="form-label" id="package-reward-label">Daily reward ('+cur+')</label><input class="field" id="package-daily" type="number" min="0" max="100000" step="'+(cur==='AFN'?'0.01':'0.0001')+'" value="'+(p?p.dailyReward:0)+'" required></div></div>'+
+ '<div class="alert" id="package-wallet-quote"></div>'+
  '<label class="form-label">Duration in days</label><input class="field" id="package-days" type="number" min="1" max="365" step="1" value="'+(p?p.days:30)+'" required>'+
  '<label class="form-label">Visibility</label><select class="field" id="package-enabled"><option value="yes" '+(!p||p.enabled!==false?'selected':'')+'>Visible to users</option><option value="no" '+(p&&p.enabled===false?'selected':'')+'>Hidden</option></select>'+
- '<div class="alert">Both AFN and USDT VIP packages use ONE USDT wallet. AFN packages convert at the admin rate when purchased. Existing memberships keep their original locked USDT reward.</div>'+
+ '<div class="alert">Only ONE USDT wallet is used. AFN VIP prices and rewards are converted using the admin rate at purchase. Existing active VIP memberships keep their original locked USDT reward and expiry.</div>'+
  '<button class="btn btn-primary btn-block" style="margin-top:20px">Save VIP package</button></form>');
+ updateVipPackageQuote();
 }
+document.addEventListener('change',function(e){if(e.target&&e.target.id==='package-currency')updateVipPackageQuote();});
+document.addEventListener('input',function(e){if(e.target&&['package-price','package-daily'].includes(e.target.id))updateVipPackageQuote();});
 
 var activeBroadcastId='';
 var broadcastWorking=false;
