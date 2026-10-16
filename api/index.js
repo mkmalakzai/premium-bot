@@ -76,7 +76,7 @@ function safePackage(value){
  if(!value||typeof value!=='object')fail(400,'Invalid package');
  const name=secureString(value.name,45);
  if(name.length<3)fail(400,'VIP package name should have at least three characters');
- return {name,price:checkAmount(value.price,1,1000000),
+ return {name,price:checkAmount(value.price,0.0001,1000000),
   dailyReward:checkAmount(value.dailyReward,0,100000),days:checkAmount(value.days,1,365),enabled:value.enabled!==false};
 }
 async function memberStatus(id,config,role='user'){
@@ -466,7 +466,8 @@ async function route(req){
   if(type==='saveSettings'){
    const announcement=secureString(body.announcement,350),botUsername=botContact(body.botUsername||'Afglionbot');
    const dailyBonus=checkAmount(body.dailyBonus,0,1000),referralPercent=checkAmount(body.referralPercent,0,50);
-   const minDeposit=checkAmount(body.minDeposit,1,100000),minWithdraw=checkAmount(body.minWithdraw,1,100000);
+   const activeMoney=currentSettings.currencyMigrationStatus==='active';
+   const minDeposit=checkAmount(body.minDeposit,activeMoney?0.0001:1,100000),minWithdraw=checkAmount(body.minWithdraw,activeMoney?0.0001:1,100000);
    const forceJoinChannel=channelUrl(body.forceJoinChannel),homeChannelUrl=channelUrl(body.homeChannelUrl);
    const depositNumber=secureString(body.depositNumber,40).replace(/[^\d+\-\s()]/g,'');
    const depositContact=botContact(body.depositContact);
