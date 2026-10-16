@@ -525,12 +525,13 @@ async function route(req){
      if(i===-1)fail(404,'Payment method not found');
      methods.splice(i,1);
     }else{
-     const m=body.method||{},name=secureString(m.name,45),number=secureString(m.number,40).replace(/[^\d+\-\s()]/g,'');
+     const m=body.method||{},name=secureString(m.name,45),number=secureString(m.number,160),currency=m.currency||'AFN';
+     if(!['AFN','USDT'].includes(currency)||!/^[-A-Za-z0-9_+:/.()\s]{0,160}$/.test(number))fail(400,'Invalid payment account or currency');
      if(name.length<3)fail(400,'Payment method name must have three or more characters');
      const idForMethod=paymentId||'pay_'+crypto.randomBytes(5).toString('hex');
      const existingIndex=methods.findIndex(x=>x.id===idForMethod);
      if(existingIndex<0&&methods.length>=12)fail(400,'Maximum 12 payment methods');
-     const value={id:idForMethod,name,number,enabled:m.enabled!==false};
+     const value={id:idForMethod,name,number,currency,enabled:m.enabled!==false};
      if(existingIndex>=0)methods[existingIndex]=value;else methods.push(value);
     }
     tx.set(settingRef,{...(snap.exists?snap.data():{}),paymentMethods:methods});
