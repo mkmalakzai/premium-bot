@@ -383,10 +383,11 @@ async function route(req){
    const active=cfg.currencyMigrationStatus==='active';
    const originalCurrency=active?String(body.currency||'USDT'):'AFN';
    if(!['AFN','USDT'].includes(originalCurrency))fail(400,'Choose AFN or USDT');
-   if(!validMoney(originalAmount,originalCurrency==='USDT'?0.0001:0.01,1000000))fail(400,'Invalid payment amount');
+   if(!validMoney(originalAmount,originalCurrency==='USDT'?0.0001:0.01,1000000)||(originalCurrency==='AFN'&&Math.abs(originalAmount-Math.round(originalAmount*100)/100)>1e-8))fail(400,'Invalid payment amount');
    const method=(cfg.paymentMethods||[]).find(m=>m.enabled!==false&&(m.id===submittedMethod||m.name===submittedMethod));
    if(!method)fail(409,'Payment method unavailable. Reload the app.');
    if(active&&(method.currency||'AFN')!==originalCurrency)fail(400,'Payment method must match the selected currency');
+   if(originalCurrency==='USDT'&&!['TRC20','BEP20','ERC20','TON','SOLANA'].includes(method.network))fail(400,'Select a USDT payment method with a configured blockchain network');
    if(type==='deposit'&&!method.number)fail(503,'Administrator has not configured a receiving account');
    const rate=active?Number(cfg.usdtAfnRate):1;
    if(!Number.isFinite(rate)||rate<=0)fail(503,'Invalid exchange rate');
@@ -396,7 +397,7 @@ async function route(req){
    if(type==='withdraw')tx.update(ref,{balance:admin.firestore.FieldValue.increment(-amount),pendingWithdraw:admin.firestore.FieldValue.increment(amount)});
    tx.set(reqRef,{userId:id,name:u.data().name||'Member',type,amount,
     currency:active?'USDT':'AFN',originalAmount,originalCurrency,rate:active?rate:1,
-    method:method.name,methodId:method.id,receivingNumber:type==='deposit'?method.number:'',
+    method:method.name,methodId:method.id,network:method.network||'LOCAL',receivingNumber:type==='deposit'?method.number:'',
     paymentReference,payoutRecipient,details,status:'pending',createdAt:now,reviewedAt:0});
    tx.set(ref.collection('activity').doc(),{label:(type==='deposit'?'Deposit':'Withdrawal')+' request submitted',amount:0,currency:active?'USDT':'AFN',at:now});
    return {ok:true,requestId:reqRef.id,amount,originalAmount,originalCurrency,rate};
@@ -526,13 +527,14 @@ async function route(req){
      if(i===-1)fail(404,'Payment method not found');
      methods.splice(i,1);
     }else{
-     const m=body.method||{},name=secureString(m.name,45),number=secureString(m.number,160),currency=m.currency||'AFN';
+     const m=body.method||{},name=secureString(m.name,45),number=secureString(m.number,160),currency=m.currency||'AFN',network=currency==='USDT'?String(m.network||''):'LOCAL';
      if(!['AFN','USDT'].includes(currency)||!/^[-A-Za-z0-9_+:/.()\s]{0,160}$/.test(number))fail(400,'Invalid payment account or currency');
+     if(currency==='USDT'&&!['TRC20','BEP20','ERC20','TON','SOLANA'].includes(network))fail(400,'Choose the USDT blockchain network');
      if(name.length<3)fail(400,'Payment method name must have three or more characters');
      const idForMethod=paymentId||'pay_'+crypto.randomBytes(5).toString('hex');
      const existingIndex=methods.findIndex(x=>x.id===idForMethod);
      if(existingIndex<0&&methods.length>=12)fail(400,'Maximum 12 payment methods');
-     const value={id:idForMethod,name,number,currency,enabled:m.enabled!==false};
+     const value={id:idForMethod,name,number,currency,network,enabled:m.enabled!==false};
      if(existingIndex>=0)methods[existingIndex]=value;else methods.push(value);
     }
     tx.set(settingRef,{...(snap.exists?snap.data():{}),paymentMethods:methods});
