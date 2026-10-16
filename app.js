@@ -400,7 +400,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  if(tab==='money'){
  html+=(a.moneyRequests||[]).length?a.moneyRequests.map(function(req){
  return '<div class="payment-review"><div class="review-header"><b>'+esc(req.type==='deposit'?'↓ Deposit':'↑ Withdrawal')+' · '+currency(req.amount)+'</b><span class="badge">PENDING</span></div>'+
- '<p><b>'+esc(req.name)+'</b> · ID '+esc(req.userId)+'</p><p>Method: '+esc(req.method)+'</p>'+
+ '<p><b>'+esc(req.name)+'</b> · ID '+esc(req.userId)+'</p><p>Method: '+esc(req.method)+'</p><p>Requested: '+esc(originalPayment(req))+' · Wallet: '+currency(req.amount)+'</p>'+
  (req.receivingNumber?'<p>Receiving number: '+esc(req.receivingNumber)+'</p>':'')+
  '<p>'+(req.type==='deposit'?'Deposit transfer reference: ':'Withdrawal recipient: ')+esc(req.type==='deposit'?(req.paymentReference||req.details):(req.payoutRecipient||req.details))+'</p><small>'+fmtDate(req.createdAt)+'</small>'+
  '<div class="review-actions"><button class="btn btn-primary btn-small" data-action="admin-money-approve" data-id="'+esc(req.id)+'">Approve</button><button class="btn btn-ghost btn-small" data-action="admin-money-reject" data-id="'+esc(req.id)+'">Reject</button></div></div>';
@@ -435,7 +435,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  html+='<div class="admin-callout">Add receiving methods such as Hawala, bank or mobile wallet. The chosen number appears to customers on Deposit with a Copy button.</div>'+
  '<button class="btn btn-primary btn-block" data-action="admin-add-method">'+icon('wallet')+' Add payment method</button>'+
  (methods.length?methods.map(function(m){
- return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(m.name)+'</b><small>'+esc(m.number||'No receiving number')+'</small></div><span class="badge '+(m.enabled===false?'red':'green')+'">'+(m.enabled===false?'HIDDEN':'ACTIVE')+'</span></div>'+
+ return '<div class="package-manage"><div class="package-manage-top"><div><b>'+esc(m.name)+' · '+esc(m.currency||'AFN')+'</b><small>'+esc(m.number||'No receiving number')+'</small></div><span class="badge '+(m.enabled===false?'red':'green')+'">'+(m.enabled===false?'HIDDEN':'ACTIVE')+'</span></div>'+
  '<div class="package-manage-actions"><button class="btn btn-outline btn-small" data-action="admin-edit-method" data-id="'+esc(m.id)+'">'+icon('edit')+' Edit</button><button class="btn btn-ghost btn-small" data-action="admin-delete-method" data-id="'+esc(m.id)+'">Delete</button></div></div>';
  }).join(''):empty('wallet','No methods available','Add your first receiving method above.'));
  }
