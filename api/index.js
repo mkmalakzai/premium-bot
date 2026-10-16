@@ -76,8 +76,12 @@ function safePackage(value){
  if(!value||typeof value!=='object')fail(400,'Invalid package');
  const name=secureString(value.name,45);
  if(name.length<3)fail(400,'VIP package name should have at least three characters');
- return {name,price:checkAmount(value.price,0.0001,1000000),
-  dailyReward:checkAmount(value.dailyReward,0,100000),days:checkAmount(value.days,1,365),enabled:value.enabled!==false};
+ const currency=value.currency||'USDT';
+ if(!['AFN','USDT'].includes(currency))fail(400,'VIP package currency must be AFN or USDT');
+ const min=currency==='AFN'?0.01:0.0001;
+ const price=checkAmount(value.price,min,1000000),dailyReward=checkAmount(value.dailyReward,0,100000);
+ if(currency==='AFN'&&(Math.abs(price-Math.round(price*100)/100)>1e-8||Math.abs(dailyReward-Math.round(dailyReward*100)/100)>1e-8))fail(400,'AFN packages allow only 2 decimal places');
+ return {name,price,dailyReward,currency,days:checkAmount(value.days,1,365),enabled:value.enabled!==false};
 }
 async function memberStatus(id,config,role='user'){
  const url=channelUrl(config.forceJoinChannel);
@@ -353,6 +357,7 @@ async function route(req){
    if(!began||!until||now>until+DAY||slot<1||slot<=(usr.vipLastClaimSlot||0))fail(409,'Next VIP reward is not available yet');
    if((usr.vipDaysClaimed||0)>=p.days)fail(409,'VIP rewards completed');
    const amount=p.dailyReward;
+   if(!validMoney(amount,0,1000000))fail(409,'Invalid locked VIP daily reward');
    tx.update(ref,{balance:admin.firestore.FieldValue.increment(amount),totalEarned:admin.firestore.FieldValue.increment(amount),
     vipLastClaimSlot:slot,vipDaysClaimed:admin.firestore.FieldValue.increment(1)});
    tx.set(ref.collection('activity').doc(),{label:usr.vipTier.toUpperCase()+' VIP daily reward',amount,at:now});
@@ -428,23 +433,34 @@ async function route(req){
    const who=u.data(),config=settings(s),packageInfo=planFor(config,tier);
    if((who.vipUntil||0)>now&&who.vipTier&&who.vipTier!=='free')fail(409,'Finish your active VIP membership before buying another package');
    requireCurrencyReady(config,who);
-   if((who.balance||0)<packageInfo.price)fail(409,'Insufficient balance. Deposit first and wait for deposit approval.');
+   // The wallet is always denominated in USDT after migration. AFN packages are quoted server-side below.
    const parentId=who.referrerId,linkedRef=parentId&&parentId!==id?users.doc(parentId):null;
    const linked=linkedRef?await tx.get(linkedRef):null;
-   const purchasedPackage={name:packageInfo.name,price:packageInfo.price,dailyReward:packageInfo.dailyReward,days:packageInfo.days,enabled:true};
-   tx.update(ref,{balance:admin.firestore.FieldValue.increment(-packageInfo.price),vipTier:tier,
+   const packageCurrency=packageInfo.currency||'USDT';
+   if(!['AFN','USDT'].includes(packageCurrency))fail(409,'Invalid VIP package currency');
+   const rate=Number(config.usdtAfnRate||65);
+   if(config.currencyMigrationStatus==='active'&&(!Number.isFinite(rate)||rate<=0))fail(503,'Exchange rate unavailable');
+   const walletPrice=config.currencyMigrationStatus==='active'&&packageCurrency==='AFN'?round4(packageInfo.price/rate):packageInfo.price;
+   const walletReward=config.currencyMigrationStatus==='active'&&packageCurrency==='AFN'?round4(packageInfo.dailyReward/rate):packageInfo.dailyReward;
+   if(walletPrice<=0)fail(400,'VIP price is too small at the current exchange rate');
+   if(walletReward<0||!Number.isFinite(walletReward))fail(400,'Invalid VIP reward');
+   if((who.balance||0)+0.00000001<walletPrice)fail(409,'Insufficient USDT wallet balance for this VIP package');
+   const purchasedPackage={name:packageInfo.name,price:walletPrice,dailyReward:walletReward,days:packageInfo.days,enabled:true,
+    currency:'USDT',originalCurrency:packageCurrency,originalPrice:packageInfo.price,originalDailyReward:packageInfo.dailyReward,
+    exchangeRateAtPurchase:packageCurrency==='AFN'?rate:null};
+   tx.update(ref,{balance:admin.firestore.FieldValue.increment(-walletPrice),vipTier:tier,
     vipActivatedAt:now,vipUntil:now+packageInfo.days*DAY,vipPlanSnapshot:purchasedPackage,
     vipDaysClaimed:0,vipLastClaimSlot:0});
-   tx.set(ref.collection('activity').doc(),{label:packageInfo.name+' VIP purchase',amount:-packageInfo.price,at:now});
+   tx.set(ref.collection('activity').doc(),{label:packageInfo.name+' VIP purchase',amount:-walletPrice,currency:'USDT',originalCurrency:packageCurrency,originalAmount:packageInfo.price,rate:packageCurrency==='AFN'?rate:null,at:now});
    const referralPct=config.referralPercent||0;
-   const award=round4(packageInfo.price*referralPct/100);
+   const award=round4(walletPrice*referralPct/100);
    if(linked&&linked.exists&&!linked.data().banned&&award>0){
     tx.update(linkedRef,{balance:admin.firestore.FieldValue.increment(award),totalEarned:admin.firestore.FieldValue.increment(award),
      referralEarned:admin.firestore.FieldValue.increment(award)});
     tx.set(linkedRef.collection('activity').doc(),{label:'VIP referral commission',amount:award,at:now});
     tx.set(store.collection(C.awards).doc(),{parentId,memberId:id,vipTier:tier,amount:award,percent:referralPct,at:now});
    }
-   return {ok:true,tier,planName:packageInfo.name,charged:packageInfo.price,vipUntil:now+packageInfo.days*DAY,referralAward:linked&&linked.exists?award:0,approvalRequired:false};
+   return {ok:true,tier,planName:packageInfo.name,charged:walletPrice,originalPrice:packageInfo.price,originalCurrency:packageCurrency,exchangeRate:packageCurrency==='AFN'?rate:null,vipUntil:now+packageInfo.days*DAY,referralAward:linked&&linked.exists?award:0,approvalRequired:false};
   });
  }
 
