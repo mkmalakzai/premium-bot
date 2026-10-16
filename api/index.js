@@ -587,7 +587,7 @@ async function route(req){
    if(cfg.currencyMigrationStatus==='active')return {ok:true,status:'active',migrated:cfg.currencyMigrationCount||0};
    if(cfg.currencyMigrationStatus!=='migrating')fail(409,'Start currency migration first');
    const rate=Number(cfg.migrationRate),cursor=String(cfg.currencyMigrationCursor||'');
-   let query=users.orderBy(admin.firestore.FieldPath.documentId()).limit(12);
+   let query=users.orderBy(admin.firestore.FieldPath.documentId()).limit(5);
    if(cursor)query=query.startAfter(cursor);
    const page=await query.get();
    let processed=0,last=cursor;
@@ -627,7 +627,7 @@ async function route(req){
      tx.update(settingRef,{currencyMigrationCursor:last,currencyMigrationCount:(c.currencyMigrationCount||0)+processed});
     });
    }
-   if(page.size===12)return {ok:true,status:'migrating',migrated:(cfg.currencyMigrationCount||0)+processed};
+   if(page.size===5)return {ok:true,status:'migrating',migrated:(cfg.currencyMigrationCount||0)+processed};
    // Complete only after no more users remain. New signups and monetary writes are blocked.
    await store.runTransaction(async tx=>{
     const snap=await tx.get(settingRef),c=settings(snap);
