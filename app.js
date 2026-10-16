@@ -104,7 +104,7 @@ section('Official Telegram channel')+'<button class="channel-banner" data-action
 
 section('Explore AFGLION')+'<div class="action-grid"><button class="action-tile" data-page="referral"><span class="action-icon">'+icon('users')+'</span><div><div class="action-title">Referral commissions</div><div class="action-desc">Earn '+n(s.referralPercent)+'% when friends purchase VIP.</div></div></button><button class="action-tile" data-page="vip"><span class="action-icon blue">'+icon('crown')+'</span><div><div class="action-title">VIP plans</div><div class="action-desc">Flexible rates and durations, admin managed.</div></div></button></div>'+
 section('Latest updates')+'<div class="notice"><div class="notice-icon">'+icon('bell')+'</div><div><h3>AFGLION updates</h3><p>'+esc(s.announcement||'Welcome to AFGLION.')+'</p></div></div>'+footer()+'</div>';}
-function referral(){var u=user(),s=data().settings,invitation=link(),pct=s.referralPercent||0,plans=s.vipPackages||s.plans||{},first=Object.keys(plans)[0],example=first?plans[first].price:0;return '<div class="view">'+goldTitle('Refer & earn.','Invite friends to AFGLION and receive a commission when their VIP purchase is approved.')+
+function referral(){var u=user(),s=data().settings,invitation=link(),pct=s.referralPercent||0,plans=s.vipPackages||s.plans||{},first=Object.keys(plans).find(function(k){return plans[k].enabled!==false;}),example=first?plans[first].price:0;return '<div class="view">'+goldTitle('Refer & earn.','Invite friends to AFGLION and receive a commission when their VIP purchase is approved.')+
 '<div class="ref-visual"><div class="ref-symbol">'+icon('share')+'</div><h2>'+n(pct)+'% Referral Commission</h2><p>Commission applies to an approved, paid VIP purchase—not to an account signup.</p><div class="invite-pill">'+icon('spark')+' Example: '+currency(Math.round(example*pct/100*10000)/10000)+' on a '+currency(example)+' VIP purchase</div></div>'+
 '<div class="stats-row"><div class="stat-small"><div class="label">Invited</div><div class="value">'+n(u.referralCount)+'</div></div><div class="stat-small"><div class="label">Commission</div><div class="value gold">'+n(u.referralEarned)+'</div></div><div class="stat-small"><div class="label">Rate</div><div class="value">'+n(pct)+'%</div></div></div>'+
 section('Your invitation link')+'<div class="ref-linkbox"><span class="ref-url">'+esc(invitation||'Referral link available after bot setup')+'</span><button class="btn btn-primary btn-small" data-action="copy-ref" '+(!invitation?'disabled':'')+'>'+icon('copy')+' Copy</button></div>'+
@@ -498,7 +498,7 @@ function renderAdmin(){var a=state.admin;if(!a){root.innerHTML=header()+'<div cl
  root.className='app-shell admin-shell';root.innerHTML=html+footer()+'</div>'+adminTabs();
  var search=document.getElementById('admin-search');
  var sortSelect=document.getElementById('admin-user-sort');
- function updateUserRows(){var q=(search&&search.value||'').toLowerCase().trim(),mode=sortSelect&&sortSelect.value;var rows=a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}).slice();rows.sort(function(x,y){var xb=Number(x.balance||0),yb=Number(y.balance||0),xv=x.vipTier&&x.vipTier!=='free'?1:0,yv=y.vipTier&&y.vipTier!=='free'?1:0;if(mode==='balance-desc')return yb-xb;if(mode==='balance-asc')return xb-yb;if(mode==='vip')return yv-xv;if(mode==='free')return xv-yv;return Number(y.joinedAt||y.createdAt||0)-Number(x.joinedAt||x.createdAt||0);});document.getElementById('admin-users').innerHTML=adminUserRows(rows);}
+ function updateUserRows(){var q=(search&&search.value||'').toLowerCase().trim(),mode=sortSelect&&sortSelect.value;var rows=a.users.filter(function(u){return ((u.name||'')+' '+(u.username||'')+' '+u.id).toLowerCase().includes(q);}).slice();rows.sort(function(x,y){var xb=Number(x.balance||0),yb=Number(y.balance||0),xv=x.vipTier&&x.vipTier!=='free'&&x.vipUntil>Date.now()?1:0,yv=y.vipTier&&y.vipTier!=='free'&&y.vipUntil>Date.now()?1:0;if(mode==='balance-desc')return yb-xb;if(mode==='balance-asc')return xb-yb;if(mode==='vip')return yv-xv;if(mode==='free')return xv-yv;return Number(y.joinedAt||y.createdAt||0)-Number(x.joinedAt||x.createdAt||0);});document.getElementById('admin-users').innerHTML=adminUserRows(rows);}
  if(search)search.addEventListener('input',updateUserRows);
  if(sortSelect)sortSelect.addEventListener('change',updateUserRows);
 }
@@ -507,7 +507,7 @@ function openUserModal(id){var u=state.admin.users.find(function(x){return x.id=
  var packages=state.admin.settings.vipPackages||state.admin.settings.plans||{};
  var tierOptions='<option value="free" '+(u.vipTier==='free'?'selected':'')+'>Free</option>'+
  Object.keys(packages).map(function(key){return '<option value="'+esc(key)+'" '+(u.vipTier===key?'selected':'')+'>'+esc(packages[key].name)+'</option>';}).join('');
- if(u.vipTier!=='free'&&!packages[u.vipTier])tierOptions+='<option value="'+esc(u.vipTier)+'" selected>Legacy · '+esc(u.vipTier)+'</option>';
+ if(u.vipTier!=='free'&&!packages[u.vipTier]&&u.vipUntil>Date.now())tierOptions+='<option value="'+esc(u.vipTier)+'" selected>Legacy active · '+esc(u.vipTier)+'</option>';
  var staff=(state.admin.staffRoles||[]).find(function(s){return s.id===id;});
  var isRoot=(state.admin.rootOwners||[]).includes(id);
  var roleLabel=isRoot?'Root owner':staff?staff.role:'Member';
