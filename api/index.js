@@ -531,6 +531,8 @@ async function route(req){
      const m=body.method||{},name=secureString(m.name,45),number=secureString(m.number,160),currency=m.currency||'AFN',network=currency==='USDT'?String(m.network||''):'LOCAL';
      if(!['AFN','USDT'].includes(currency)||!/^[-A-Za-z0-9_+:/.()\s]{0,160}$/.test(number))fail(400,'Invalid payment account or currency');
      if(currency==='USDT'&&!['TRC20','BEP20','ERC20','TON','SOLANA'].includes(network))fail(400,'Choose the USDT blockchain network');
+     if(currency==='USDT'&&['BEP20','ERC20'].includes(network)&&!/^0x[0-9a-fA-F]{40}$/.test(number))fail(400,'BEP20/ERC20 deposit address must be a valid 0x wallet address');
+     if(currency==='USDT'&&network==='TRC20'&&!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(number))fail(400,'TRC20 deposit address must be a valid TRON address');
      if(name.length<3)fail(400,'Payment method name must have three or more characters');
      const idForMethod=paymentId||'pay_'+crypto.randomBytes(5).toString('hex');
      const existingIndex=methods.findIndex(x=>x.id===idForMethod);
