@@ -282,7 +282,7 @@ function showMethodDestination(){
  if(copy)copy.disabled=!(m&&m.number);
  if(submit)submit.disabled=!(m&&m.number);
  var cur=document.getElementById('money-currency'),unitName=cur&&cur.value||'AFN',rate=Number(data().settings.usdtAfnRate||65),isActive=data().settings.currencyMigrationStatus==='active',min=Number(form.dataset.minimum||1);
- var minOriginal=isActive&&unitName==='AFN'?Math.ceil(min*rate*100-0.00001)/100:min;
+ var minOriginal=isActive&&unitName==='AFN'?Math.ceil((min-0.000049)*rate*100-0.00001)/100:min;
  var amount=document.getElementById('money-amount'),label=document.getElementById('money-amount-label');
  if(amount){amount.min=minOriginal;amount.step=unitName==='AFN'?'0.01':'0.0001';amount.placeholder='Enter '+unitName+' amount';}
  if(label)label.textContent='Amount ('+unitName+') · Minimum '+n(minOriginal)+' '+unitName;
@@ -299,7 +299,7 @@ function updateMoneyMethodOptions(){
 function paymentModal(type){
  var st=data().settings,deposit=type==='deposit',active=st.currencyMigrationStatus==='active',initial='AFN',
  methods=availableMethods(deposit,initial),contact=st.depositContact||'Mk_Malakzai',min=Number(deposit?st.minDeposit:st.minWithdraw),
- initialMin=active?Math.ceil(min*Number(st.usdtAfnRate||65)*100-0.00001)/100:min,ready=methods.some(function(m){return !!m.number;});
+ initialMin=active?Math.ceil((min-0.000049)*Number(st.usdtAfnRate||65)*100-0.00001)/100:min,ready=methods.some(function(m){return !!m.number;});
  if(st.currencyMigrationStatus==='migrating')return toast('Currency conversion is in progress. Try again after it finishes.');
  modal(deposit?'Deposit':'Withdraw',
  '<div class="payment-intro">'+icon('wallet')+'<span>'+esc(deposit?st.depositInstructions:st.payoutInstructions)+'</span></div>'+
