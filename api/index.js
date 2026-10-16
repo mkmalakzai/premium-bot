@@ -14,7 +14,7 @@ const C = {
 const DEFAULTS = {
  appName:'AFGLION', botUsername:'Afglionbot',
  announcement:'Welcome to AFGLION. Deposit and withdrawal requests are reviewed manually.',
- adsEnabled:false, adsBlockId:'52925', adsReward:0, adsDailyLimit:5,
+ usdtAfnRate:65, currencyMigrationStatus:'pending', adsEnabled:false, adsBlockId:'52925', adsReward:0, adsDailyLimit:5,
  dailyBonus:0, dailyEnabled:false, referralPercent:10, minDeposit:50, minWithdraw:100,
  forceJoinEnabled:true,forceJoinChannel:'https://t.me/geminipromtshub',homeChannelUrl:'https://t.me/geminipromtshub',
  depositNumber:'',depositContact:'Mk_Malakzai',
@@ -540,6 +540,13 @@ async function route(req){
   }
   // VIP purchases are automatically activated in one Firestore transaction; no manual VIP approvals.
 
+  if(type==='saveExchangeRate'){
+   if(role!=='owner')fail(403,'Owner only');
+   const rate=Number(body.rate);
+   if(!Number.isFinite(rate)||rate<1||rate>1000||Math.round(rate*10000)!==Math.round(rate*10000))fail(400,'Invalid USDT/AFN rate');
+   await settingRef.set({usdtAfnRate:rate},{merge:true});
+   return {ok:true,rate};
+  }
   if(type==='saveAdsSettings'){
    if(role!=='owner')fail(403,'Owner only');
    const adsEnabled=body.adsEnabled===true,adsReward=Number(body.adsReward),adsDailyLimit=Number(body.adsDailyLimit);
