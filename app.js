@@ -200,7 +200,7 @@ case 'admin-money-reject':if(confirm('Reject this payment request?'))await admin
 case 'admin-retry-notice':await adminAction('retryNotification',{noticeId:target.dataset.id});break;
 case 'admin-test-notice':await adminAction('testNotification',{});break;
 case 'currency-rate-save':await adminAction('saveExchangeRate',{rate:getNum('currency-rate')});break;
-case 'currency-begin':if(confirm('Convert all existing AFN balances to USDT at the saved rate? This changes live member balances. Export a Firebase backup first.')){await adminAction('beginCurrencyMigration',{});await runCurrencyMigration();}break;
+case 'currency-begin':if(confirm('Convert all existing AFN balances to USDT at the saved rate? This changes live member balances. Export a Firebase backup first.')){var migrationStart=await adminAction('beginCurrencyMigration',{});if(migrationStart&&migrationStart.ok)await runCurrencyMigration();}break;
 case 'currency-continue':await runCurrencyMigration();break;
 case 'ads-save':await adminAction('saveAdsSettings',{adsEnabled:document.getElementById('ads-enabled').checked,adsReward:Number(document.getElementById('ads-reward').value),adsDailyLimit:Number(document.getElementById('ads-limit').value)});break;
 case 'ads-callback':try{var linkResult=await api('adminAction',{type:'adsCallbackUrl'});modal('AdsGram Reward URL','<p class="body-sub">Paste this confidential URL into AdsGram Block 52925 Reward URL. Do not share it publicly.</p><textarea class="field" rows="5" readonly>'+esc(linkResult.url)+'</textarea>');}catch(e){toast(e.message);}break;
@@ -599,7 +599,7 @@ async function advanceBroadcast(){
 }
 
 async function runCurrencyMigration(){if(state.loading)return;state.loading=true;try{var outcome;for(var i=0;i<50;i++){outcome=await api('adminAction',{type:'currencyMigrationBatch'});if(outcome.status==='active')break;}state.admin=await api('adminData');await refresh();state.page='admin';state.adminTab='currency';renderAdmin();toast(outcome.status==='active'?'USDT migration completed. Create new VIP packages.':'Batch saved. Tap Continue currency conversion to finish.');}catch(e){toast('Conversion paused safely: '+e.message+'. Use Continue to retry.');try{state.admin=await api('adminData');renderAdmin();}catch(ignore){}}finally{state.loading=false;}}
-async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{var outcome=await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast(outcome&&outcome.notificationSent===false?'Approved, but channel post failed — open Notifications':outcome&&outcome.sent===false?'Notification failed. Check channel permissions.':'Changes saved');}catch(e){toast(e.message);}finally{state.loading=false;}}
+async function adminAction(type,payload){if(state.loading)return;state.loading=true;try{var outcome=await api('adminAction',Object.assign({type:type},payload));closeModal();state.admin=await api('adminData');await refresh();state.page='admin';renderAdmin();toast(outcome&&outcome.notificationSent===false?'Approved, but channel post failed — open Notifications':outcome&&outcome.sent===false?'Notification failed. Check channel permissions.':'Changes saved');return outcome;}catch(e){toast(e.message);return null;}finally{state.loading=false;}}
 
 init();
 })();
